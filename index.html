@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Specs — CYTD 9L Depletion Treemap</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #141420; color: #fff; overflow-x: hidden; }
+  h1 { text-align: center; padding: 16px 0 2px; font-size: 1.5rem; font-weight: 600; letter-spacing: .4px; color: #e0e0e0; }
+  .subtitle { text-align: center; font-size: .9rem; color: #777; margin-bottom: 8px; }
+  #treemap { width: 100%; margin: 0 auto; }
+  .leaf rect { stroke: #141420; stroke-width: 1px; cursor: pointer; transition: opacity .12s; }
+  .leaf:hover rect { opacity: .8; }
+  .leaf text { fill: #fff; pointer-events: none; font-weight: 600; text-anchor: middle; dominant-baseline: central; }
+  .sector-label { fill: #ccc; font-size: 8px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; }
+  .legend { display: flex; justify-content: center; align-items: center; gap: 10px; margin: 8px auto 12px; font-size: .85rem; color: #999; }
+  .legend-bar { width: 280px; height: 14px; border-radius: 7px; }
+  #tooltip {
+    position: fixed; pointer-events: none; display: none; z-index: 10;
+    background: rgba(16,16,30,.94); border: 1px solid #555; border-radius: 8px;
+    padding: 10px 14px; font-size: .82rem; line-height: 1.55; color: #ddd;
+    backdrop-filter: blur(6px); max-width: 300px;
+  }
+  #tooltip .tt-brand { font-weight: 700; font-size: .95rem; color: #fff; }
+  #tooltip .tt-sub   { color: #aaa; font-size: .72rem; margin-bottom: 4px; }
+  #tooltip b.pos { color: #4caf50; }
+  #tooltip b.neg { color: #ef5350; }
+  #tooltip b.neu { color: #aaa; }
+</style>
+</head>
+<body>
+
+<h1>Specs — CYTD 9L Depletions by Category</h1>
+<p class="subtitle">Box size = 9L cases · Color intensity = YoY % change · Hover for details</p>
+
+<div class="legend">
+  <span>–30%</span>
+  <canvas class="legend-bar" id="legendBar"></canvas>
+  <span>+30%</span>
+</div>
+
+<div id="treemap"></div>
+<div id="tooltip"></div>
+
+<script>
+const raw = [
+  {cat:"Brandy",brand:"Paul Masson Brandy",rank:1,dep:16655,pct:-0.027},
+  {cat:"Brandy",brand:"E&J Brandy",rank:2,dep:10716,pct:-0.098},
+  {cat:"Brandy",brand:"Christian Bros Brandy",rank:3,dep:4331,pct:-0.051},
+  {cat:"Brandy",brand:"Presidente",rank:4,dep:1963,pct:-0.111},
+  {cat:"Brandy",brand:"St Remy",rank:5,dep:1460,pct:-0.024},
+  {cat:"Brandy",brand:"Raynal Brandy",rank:6,dep:858,pct:-0.056},
+  {cat:"Brandy",brand:"Korbel Brandy",rank:7,dep:740,pct:-0.088},
+  {cat:"Brandy",brand:"Hartley Brandy",rank:8,dep:705,pct:-0.223},
+  {cat:"Brandy",brand:"Stella Rosa Brandy",rank:9,dep:667,pct:-0.23},
+  {cat:"Brandy",brand:"Hiram Walker Brandy",rank:10,dep:497,pct:0.205},
+  {cat:"Brandy",brand:"Torres Brandy",rank:11,dep:442,pct:-0.069},
+  {cat:"Brandy",brand:"Ciroc Brandy",rank:12,dep:298,pct:-0.215},
+  {cat:"Brandy",brand:"Dekuyper Brandy",rank:13,dep:287,pct:-0.368},
+  {cat:"Brandy",brand:"Fleischmann's Brandy",rank:14,dep:170,pct:-0.109},
+  {cat:"Brandy",brand:"Don Pedro",rank:15,dep:163,pct:-0.099},
+  {cat:"Cognac",brand:"Hennessy",rank:1,dep:26040,pct:-0.039},
+  {cat:"Cognac",brand:"Remy Martin",rank:2,dep:5127,pct:-0.02},
+  {cat:"Cognac",brand:"Courvoisier",rank:3,dep:4480,pct:0.246},
+  {cat:"Cognac",brand:"D'Usse Cognac",rank:4,dep:4076,pct:-0.004},
+  {cat:"Cognac",brand:"Martell",rank:5,dep:3356,pct:-0.102},
+  {cat:"Cognac",brand:"Salignac",rank:6,dep:835,pct:0.84},
+  {cat:"Cognac",brand:"Gran Gala Cognac",rank:7,dep:356,pct:0},
+  {cat:"Cognac",brand:"Branson",rank:8,dep:278,pct:0.067},
+  {cat:"Cognac",brand:"Ferrand Cognac",rank:9,dep:236,pct:-0.357},
+  {cat:"Cognac",brand:"De Chassenac Cognac",rank:10,dep:229,pct:0.656},
+  {cat:"Cordials",brand:"Dekuyper Cordial",rank:1,dep:23292,pct:0.008},
+  {cat:"Cordials",brand:"Baileys",rank:2,dep:19873,pct:-0.064},
+  {cat:"Cordials",brand:"99 Liqueurs",rank:3,dep:13578,pct:0.036},
+  {cat:"Cordials",brand:"Jinro Cordial",rank:4,dep:12626,pct:-0.116},
+  {cat:"Cordials",brand:"Kahlua",rank:5,dep:9613,pct:-0.043},
+  {cat:"Cordials",brand:"Jagermeister",rank:6,dep:8636,pct:-0.007},
+  {cat:"Cordials",brand:"Grand Marnier",rank:7,dep:8603,pct:-0.023},
+  {cat:"Cordials",brand:"Cointreau",rank:8,dep:7042,pct:0.063},
+  {cat:"Cordials",brand:"Disaronno",rank:9,dep:7003,pct:-0.074},
+  {cat:"Cordials",brand:"Ole Smoky Cordial",rank:10,dep:6573,pct:-0.111},
+  {cat:"Cordials",brand:"Rum Chata Cordial",rank:11,dep:6235,pct:-0.172},
+  {cat:"Cordials",brand:"Carolans",rank:12,dep:5670,pct:0.11},
+  {cat:"Cordials",brand:"Hpnotiq",rank:13,dep:5577,pct:-0.165},
+  {cat:"Cordials",brand:"Aperol",rank:14,dep:5169,pct:0.107},
+  {cat:"Cordials",brand:"Gran Malo Cordial",rank:15,dep:4918,pct:8.005},
+  {cat:"Gin",brand:"Bombay Gin",rank:1,dep:13807,pct:-0.038},
+  {cat:"Gin",brand:"Seagram's Gin",rank:2,dep:13344,pct:0.009},
+  {cat:"Gin",brand:"Tanqueray Gin",rank:3,dep:13012,pct:-0.027},
+  {cat:"Gin",brand:"New Amsterdam Gin",rank:4,dep:7413,pct:-0.011},
+  {cat:"Gin",brand:"Hendrick's",rank:5,dep:6393,pct:0.019},
+  {cat:"Gin",brand:"Beefeater Gin",rank:6,dep:3498,pct:-0.098},
+  {cat:"Gin",brand:"Gordon's Gin",rank:7,dep:2859,pct:-0.098},
+  {cat:"Gin",brand:"Taaka Gin",rank:8,dep:2101,pct:-0.137},
+  {cat:"Gin",brand:"Gilbey's Gin",rank:9,dep:1762,pct:-0.072},
+  {cat:"Gin",brand:"Miles Gin",rank:10,dep:1753,pct:0.023},
+  {cat:"Gin",brand:"The Botanist Gin",rank:11,dep:1742,pct:0.046},
+  {cat:"Gin",brand:"Empress 1908 Gin",rank:12,dep:1606,pct:-0.125},
+  {cat:"Gin",brand:"McCormick Gin",rank:13,dep:1556,pct:-0.146},
+  {cat:"Gin",brand:"Citadelle Gin",rank:14,dep:1202,pct:0.01},
+  {cat:"Gin",brand:"Aviation Gin",rank:15,dep:1067,pct:-0.274},
+  {cat:"Grain Alcohol",brand:"Everclear",rank:1,dep:3396,pct:0.043},
+  {cat:"Grain Alcohol",brand:"Red Grain Alchl",rank:2,dep:1221,pct:0.086},
+  {cat:"Grain Alcohol",brand:"Diesel Grain Alchl",rank:3,dep:134,pct:0.113},
+  {cat:"Non-Alcoholic",brand:"Ritual Zero Proof",rank:1,dep:1127,pct:0.179},
+  {cat:"Non-Alcoholic",brand:"Lyre's",rank:2,dep:190,pct:-0.069},
+  {cat:"Non-Alcoholic",brand:"Kin Euphorics",rank:3,dep:135,pct:-0.319},
+  {cat:"Prepared Cocktails",brand:"High Noon",rank:1,dep:199748,pct:0.165},
+  {cat:"Prepared Cocktails",brand:"Cutwater",rank:2,dep:95053,pct:5.171},
+  {cat:"Prepared Cocktails",brand:"BuzzBallz",rank:3,dep:44051,pct:0.49},
+  {cat:"Prepared Cocktails",brand:"Nutrl",rank:4,dep:29324,pct:0.88},
+  {cat:"Prepared Cocktails",brand:"Surfside",rank:5,dep:24307,pct:3.773},
+  {cat:"Prepared Cocktails",brand:"Jose Cuervo Cocktail",rank:6,dep:21239,pct:-0.057},
+  {cat:"Prepared Cocktails",brand:"Mom Water",rank:7,dep:14799,pct:0.411},
+  {cat:"Prepared Cocktails",brand:"1800 Cocktail",rank:8,dep:14407,pct:-0.152},
+  {cat:"Prepared Cocktails",brand:"VMC Cocktail",rank:9,dep:14003,pct:1.026},
+  {cat:"Prepared Cocktails",brand:"Crown Royal Cocktail",rank:10,dep:12492,pct:-0.036},
+  {cat:"Prepared Cocktails",brand:"Long Drink",rank:11,dep:11020,pct:-0.103},
+  {cat:"Prepared Cocktails",brand:"Sun Cruiser",rank:12,dep:10775,pct:42.043},
+  {cat:"Prepared Cocktails",brand:"On The Rocks",rank:13,dep:10751,pct:0.166},
+  {cat:"Prepared Cocktails",brand:"Malibu Cocktail",rank:14,dep:9924,pct:0.007},
+  {cat:"Prepared Cocktails",brand:"Jack Daniel's RTD",rank:15,dep:9745,pct:0.137},
+  {cat:"Rum",brand:"Bacardi",rank:1,dep:60984,pct:-0.062},
+  {cat:"Rum",brand:"Malibu",rank:2,dep:41008,pct:-0.107},
+  {cat:"Rum",brand:"Captain Morgan",rank:3,dep:32695,pct:-0.026},
+  {cat:"Rum",brand:"Cruzan",rank:4,dep:12570,pct:-0.103},
+  {cat:"Rum",brand:"Calypso Rum",rank:5,dep:11096,pct:0.021},
+  {cat:"Rum",brand:"Flor De Cana",rank:6,dep:8407,pct:-0.049},
+  {cat:"Rum",brand:"Sailor Jerry",rank:7,dep:7726,pct:-0.11},
+  {cat:"Rum",brand:"Parrot Bay",rank:8,dep:6105,pct:-0.158},
+  {cat:"Rum",brand:"The Kraken",rank:9,dep:5614,pct:-0.104},
+  {cat:"Rum",brand:"Admiral Nelsons",rank:10,dep:4405,pct:-0.12},
+  {cat:"Rum",brand:"Don Q Rum",rank:11,dep:3613,pct:0.028},
+  {cat:"Rum",brand:"Ronrico Rum",rank:12,dep:3068,pct:-0.122},
+  {cat:"Rum",brand:"Ron Rio",rank:13,dep:2363,pct:-0.107},
+  {cat:"Rum",brand:"Santa Teresa",rank:14,dep:2303,pct:-0.067},
+  {cat:"Rum",brand:"Blue Chair Bay",rank:15,dep:2220,pct:-0.3},
+  {cat:"Tequila",brand:"Lunazul",rank:1,dep:52753,pct:0.386},
+  {cat:"Tequila",brand:"Don Julio",rank:2,dep:45393,pct:-0.051},
+  {cat:"Tequila",brand:"Jose Cuervo",rank:3,dep:38133,pct:-0.052},
+  {cat:"Tequila",brand:"Espolon",rank:4,dep:29439,pct:0.148},
+  {cat:"Tequila",brand:"1800 Tequila",rank:5,dep:28599,pct:-0.124},
+  {cat:"Tequila",brand:"Hornitos",rank:6,dep:23862,pct:-0.109},
+  {cat:"Tequila",brand:"Patron",rank:7,dep:17282,pct:-0.064},
+  {cat:"Tequila",brand:"El Jimador",rank:8,dep:16511,pct:-0.137},
+  {cat:"Tequila",brand:"Casamigos",rank:9,dep:16211,pct:-0.216},
+  {cat:"Tequila",brand:"Teremana",rank:10,dep:12863,pct:-0.05},
+  {cat:"Tequila",brand:"Lalo Tequila",rank:11,dep:12381,pct:0.509},
+  {cat:"Tequila",brand:"Tortilla Tequila",rank:12,dep:11487,pct:0.005},
+  {cat:"Tequila",brand:"Sauza",rank:13,dep:9737,pct:-0.047},
+  {cat:"Tequila",brand:"Cazadores",rank:14,dep:9099,pct:0.037},
+  {cat:"Tequila",brand:"Gran Centenario",rank:15,dep:7958,pct:0.08},
+  {cat:"Vodka",brand:"Tito's",rank:1,dep:191531,pct:0},
+  {cat:"Vodka",brand:"Svedka",rank:2,dep:71219,pct:0.178},
+  {cat:"Vodka",brand:"Smirnoff",rank:3,dep:63599,pct:-0.1},
+  {cat:"Vodka",brand:"Deep Eddy",rank:4,dep:45053,pct:-0.03},
+  {cat:"Vodka",brand:"Taaka Vodka",rank:5,dep:41988,pct:-0.048},
+  {cat:"Vodka",brand:"New Amsterdam",rank:6,dep:34878,pct:-0.087},
+  {cat:"Vodka",brand:"McCormick Vodka",rank:7,dep:30024,pct:-0.039},
+  {cat:"Vodka",brand:"Skyy",rank:8,dep:26981,pct:-0.043},
+  {cat:"Vodka",brand:"Pinnacle",rank:9,dep:25886,pct:-0.099},
+  {cat:"Vodka",brand:"Grey Goose",rank:10,dep:24056,pct:0.008},
+  {cat:"Vodka",brand:"Ketel One",rank:11,dep:22488,pct:0},
+  {cat:"Vodka",brand:"Absolut",rank:12,dep:21460,pct:-0.086},
+  {cat:"Vodka",brand:"Nikolai Vodka",rank:13,dep:20891,pct:0},
+  {cat:"Vodka",brand:"Platinum 7X",rank:14,dep:19034,pct:-0.027},
+  {cat:"Vodka",brand:"Townes Vodka",rank:15,dep:14927,pct:0.296},
+  {cat:"Whiskey",brand:"Crown Royal",rank:1,dep:149394,pct:-0.094},
+  {cat:"Whiskey",brand:"Jim Beam",rank:2,dep:104182,pct:-0.022},
+  {cat:"Whiskey",brand:"Jack Daniel's",rank:3,dep:80655,pct:-0.07},
+  {cat:"Whiskey",brand:"Evan Williams",rank:4,dep:53501,pct:-0.037},
+  {cat:"Whiskey",brand:"Maker's Mark",rank:5,dep:41807,pct:-0.006},
+  {cat:"Whiskey",brand:"Fireball",rank:6,dep:38854,pct:-0.086},
+  {cat:"Whiskey",brand:"Buffalo Trace",rank:7,dep:37087,pct:0.185},
+  {cat:"Whiskey",brand:"Jameson",rank:8,dep:34114,pct:-0.017},
+  {cat:"Whiskey",brand:"Buchanan's",rank:9,dep:32423,pct:-0.105},
+  {cat:"Whiskey",brand:"Seagram's 7",rank:10,dep:29786,pct:-0.089},
+  {cat:"Whiskey",brand:"Johnnie Walker",rank:11,dep:25749,pct:-0.046},
+  {cat:"Whiskey",brand:"Woodford Reserve",rank:12,dep:24726,pct:0.033},
+  {cat:"Whiskey",brand:"Rich & Rare",rank:13,dep:21725,pct:-0.041},
+  {cat:"Whiskey",brand:"Bulleit",rank:14,dep:21645,pct:-0.076},
+  {cat:"Whiskey",brand:"Wild Turkey",rank:15,dep:21547,pct:-0.011},
+];
+
+// ── Build hierarchy by Category ─────────────────────────────────
+const catMap = new Map();
+raw.forEach(d => {
+  if (!catMap.has(d.cat)) catMap.set(d.cat, []);
+  catMap.get(d.cat).push(d);
+});
+
+const data = {
+  name: "Specs",
+  children: Array.from(catMap, ([name, items]) => ({
+    name,
+    children: items
+  }))
+};
+
+// ── Color scale: pure red ↔ pure green ──────────────────────────
+const maxPct = 0.30;
+
+function vColor(v) {
+  if (v === null || v === undefined) return '#444';
+  const t = Math.min(Math.abs(v) / maxPct, 1);
+  if (v > 0) {
+    const r = Math.round(28 + (1 - t) * 50);
+    const g = Math.round(70 + t * 165);
+    const b = Math.round(28 + (1 - t) * 50);
+    return `rgb(${r},${g},${b})`;
+  } else if (v < 0) {
+    const r = Math.round(100 + t * 155);
+    const g = Math.round(40 * (1 - t));
+    const b = Math.round(40 * (1 - t));
+    return `rgb(${r},${g},${b})`;
+  } else {
+    return 'rgb(70,70,70)';
+  }
+}
+
+// ── Legend gradient ─────────────────────────────────────────────
+const canvas = document.getElementById('legendBar');
+canvas.width = 280; canvas.height = 14;
+const ctx = canvas.getContext('2d');
+for (let x = 0; x < 280; x++) {
+  const v = -maxPct + (x / 279) * maxPct * 2;
+  ctx.fillStyle = vColor(v);
+  ctx.fillRect(x, 0, 1, 14);
+}
+
+// ── Treemap layout ──────────────────────────────────────────────
+const width  = 700;
+const height = 480;
+
+const svg = d3.select('#treemap')
+  .append('svg')
+  .attr('viewBox', `0 0 ${width} ${height}`)
+  .attr('preserveAspectRatio', 'xMidYMid meet')
+  .style('width', '100%')
+  .style('height', 'auto');
+
+const root = d3.hierarchy(data)
+  .sum(d => d.dep || 0)
+  .sort((a, b) => b.value - a.value);
+
+d3.treemap()
+  .size([width, height])
+  .paddingTop(16)
+  .paddingInner(1.5)
+  .paddingOuter(2)
+  .round(true)(root);
+
+// ── Sector headers ──────────────────────────────────────────────
+const sectors = svg.selectAll('.sector')
+  .data(root.children)
+  .join('g');
+
+sectors.append('rect')
+  .attr('x', d => d.x0)
+  .attr('y', d => d.y0)
+  .attr('width', d => d.x1 - d.x0)
+  .attr('height', d => d.y1 - d.y0)
+  .attr('fill', 'none');
+
+sectors.append('text')
+  .attr('class', 'sector-label')
+  .attr('x', d => d.x0 + 4)
+  .attr('y', d => d.y0 + 11)
+  .text(d => d.data.name)
+  .each(function(d) {
+    const maxW = d.x1 - d.x0 - 6;
+    while (this.getComputedTextLength() > maxW && this.textContent.length > 3) {
+      this.textContent = this.textContent.slice(0, -4) + '…';
+    }
+  });
+
+// ── Leaf nodes ──────────────────────────────────────────────────
+const tooltip = document.getElementById('tooltip');
+
+const leaves = svg.selectAll('.leaf')
+  .data(root.leaves())
+  .join('g')
+  .attr('class', 'leaf')
+  .attr('transform', d => `translate(${d.x0},${d.y0})`);
+
+leaves.append('rect')
+  .attr('width',  d => d.x1 - d.x0)
+  .attr('height', d => d.y1 - d.y0)
+  .attr('rx', 2)
+  .attr('fill', d => vColor(d.data.pct));
+
+// Labels
+leaves.each(function(d) {
+  const w = d.x1 - d.x0;
+  const h = d.y1 - d.y0;
+  const g = d3.select(this);
+  const cx = w / 2, cy = h / 2;
+
+  if (w > 20 && h > 14) {
+    const maxChars = Math.max(3, Math.floor(w / 5));
+    let label = d.data.brand;
+    if (label.length > maxChars) label = label.slice(0, maxChars - 1) + '…';
+    const fs = w > 80 && h > 28 ? 9 : w > 45 ? 7 : 5.5;
+    g.append('text').attr('class','lbl-name')
+      .attr('x', cx).attr('y', h > 28 ? cy - 5 : cy)
+      .attr('font-size', fs + 'px')
+      .text(label);
+  }
+  if (w > 25 && h > 28) {
+    const pct = d.data.pct;
+    let txt = pct === 0 ? '0.0%' : (pct > 0 ? '+' : '') + (pct * 100).toFixed(1) + '%';
+    const fs = w > 80 ? 8 : 6;
+    g.append('text').attr('class','lbl-pct')
+      .attr('x', cx).attr('y', cy + 5)
+      .attr('font-size', fs + 'px')
+      .attr('opacity', '.88')
+      .text(txt);
+  }
+});
+
+// ── Tooltip ─────────────────────────────────────────────────────
+function fmt(n) { return n.toLocaleString('en-US', {maximumFractionDigits: 0}); }
+
+leaves
+  .on('mousemove', function(event, d) {
+    const p = d.data.pct;
+    const pctStr = p === 0 ? '0.0%' : (p > 0 ? '+' : '') + (p * 100).toFixed(1) + '%';
+    const cls = p === 0 ? 'neu' : p > 0 ? 'pos' : 'neg';
+    tooltip.innerHTML = `
+      <div class="tt-brand">${d.data.brand}</div>
+      <div class="tt-sub">${d.parent.data.name} · Rank #${d.data.rank}</div>
+      <div>CYTD 9L Depl: <b>${fmt(d.data.dep)}</b></div>
+      <div>% Change: <b class="${cls}">${pctStr}</b></div>
+    `;
+    tooltip.style.display = 'block';
+    const tx = Math.min(event.clientX + 14, window.innerWidth - 310);
+    const ty = Math.min(event.clientY + 14, window.innerHeight - 100);
+    tooltip.style.left = tx + 'px';
+    tooltip.style.top  = ty + 'px';
+  })
+  .on('mouseleave', () => { tooltip.style.display = 'none'; });
+</script>
+</body>
+</html>
