@@ -225,12 +225,11 @@ function drawTreemap(marketFilter, periodFilter) {
       const pctStr = p === null ? 'N/A' : p === 0 ? '0.0%' : (p > 0 ? '+' : '') + (p * 100).toFixed(1) + '%';
       const cls = p === null ? 'neu' : p > 0 ? 'pos' : 'neg';
       const rankStr = d.data.rank ? `Rank #${d.data.rank}` : '';
-      tooltip.innerHTML = `
-        <div class="tt-brand">$${d.data.brand}</div>
-        <div class="tt-sub">$${d.parent.data.name}${rankStr ? ' \u00B7 ' + rankStr : ''}</div>
-        <div>CYTD 9L Depl: <b>$${fmt(d.data.dep)}</b></div>
-        <div>% Change: <b class="$${cls}">$${pctStr}</b></div>
-      `;
+      tooltip.innerHTML =
+        '<div class="tt-brand">' + d.data.brand + '</div>' +
+        '<div class="tt-sub">' + d.parent.data.name + (rankStr ? ' \u00B7 ' + rankStr : '') + '</div>' +
+        '<div>9L Depl: <b>' + fmt(d.data.dep) + '</b></div>' +
+        '<div>% Change: <b class="' + cls + '">' + pctStr + '</b></div>';
       tooltip.style.display = 'block';
       tooltip.style.left = Math.min(event.clientX + 14, window.innerWidth - 310) + 'px';
       tooltip.style.top = Math.min(event.clientY + 14, window.innerHeight - 100) + 'px';
