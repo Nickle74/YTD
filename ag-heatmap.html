@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AG 9L Heat Map</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #141420; color: #fff; overflow-x: hidden; }
+  h1 { text-align: center; padding: 14px 0 2px; font-size: 1.5rem; font-weight: 600; letter-spacing: .4px; color: #e0e0e0; }
+  .controls { display: flex; justify-content: center; align-items: center; gap: 16px; margin: 8px auto 6px; flex-wrap: wrap; }
+  .controls label { font-size: .85rem; color: #aaa; }
+  .controls select {
+    background: #222238; color: #fff; border: 1px solid #555; border-radius: 6px;
+    padding: 6px 12px; font-size: .85rem; cursor: pointer; min-width: 260px;
+  }
+  .controls select:focus { outline: none; border-color: #7c7cff; }
+  .subtitle { text-align: center; font-size: .85rem; color: #777; margin-bottom: 6px; }
+  #treemap { width: 100%; margin: 0 auto; }
+  #treemap svg { width: 100%; }
+  .sector-border { stroke: rgba(255,255,255,0.25); stroke-width: 1.5px; fill: none; rx: 3; }
+  .sector-label { fill: #fff; font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: .8px; paint-order: stroke; stroke: #141420; stroke-width: 3px; pointer-events: none; }
+  .leaf rect { stroke: #141420; stroke-width: 1px; cursor: pointer; transition: opacity .12s; }
+  .leaf:hover rect { opacity: .8; }
+  .leaf text { fill: #fff; pointer-events: none; font-weight: 600; text-anchor: middle; dominant-baseline: central; }
+  .legend { display: flex; justify-content: center; align-items: center; gap: 10px; margin: 4px auto 10px; font-size: .82rem; color: #999; }
+  .legend-bar { width: 260px; height: 12px; border-radius: 6px; }
+  .size-controls { display: flex; justify-content: center; align-items: center; gap: 12px; margin: 0 auto 8px; }
+  .size-controls label { font-size: .78rem; color: #777; }
+  .size-controls input[type=range] {
+    -webkit-appearance: none; appearance: none; width: 180px; height: 6px;
+    background: #333; border-radius: 3px; outline: none;
+  }
+  .size-controls input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none; appearance: none; width: 16px; height: 16px;
+    background: #7c7cff; border-radius: 50%; cursor: pointer;
+  }
+  .size-controls span { font-size: .75rem; color: #666; min-width: 40px; text-align: center; }
+  #tooltip {
+    position: fixed; pointer-events: none; display: none; z-index: 10;
+    background: rgba(16,16,30,.96); border: 1px solid #555; border-radius: 10px;
+    padding: 12px 16px; font-size: .8rem; line-height: 1.6; color: #ddd;
+    backdrop-filter: blur(8px); max-width: 360px; min-width: 280px;
+  }
+  #tooltip .tt-name { font-weight: 700; font-size: 1rem; color: #fff; margin-bottom: 2px; }
+  #tooltip .tt-premise { color: #aaa; font-size: .72rem; margin-bottom: 8px; }
+  #tooltip table { width: 100%; border-collapse: collapse; }
+  #tooltip th { text-align: left; color: #888; font-weight: 600; font-size: .7rem; text-transform: uppercase; padding: 2px 0; }
+  #tooltip td { padding: 1px 6px 1px 0; font-size: .78rem; }
+  #tooltip td.val { text-align: right; font-weight: 600; }
+  #tooltip td.var { text-align: right; font-size: .72rem; }
+  #tooltip td.varp { text-align: right; font-weight: 600; font-size: .75rem; }
+  .pos { color: #4caf50; }
+  .neg { color: #ef5350; }
+  .neu { color: #aaa; }
+</style>
+</head>
+<body>
+
+<h1>AG 9L Heat Map</h1>
+
+<div class="controls">
+  <label for="siteSelect">Site:</label>
+  <select id="siteSelect"></select>
+</div>
+
+<p class="subtitle">Box size = 9L cases | Color = 9L Var% | Grouped by On/Off Premise | Hover for full metrics</p>
+
+<div class="legend">
+  <span>-30%</span>
+  <canvas class="legend-bar" id="legendBar"></canvas>
+  <span>+30%</span>
+</div>
+
+<div class="size-controls">
+  <label for="sizeSlider">Chart Height:</label>
+  <input type="range" id="sizeSlider" min="300" max="900" value="550" step="50">
+  <span id="sizeLabel">550px</span>
+</div>
+
+<div id="treemap"></div>
+<div id="tooltip"></div>
+
+<script>
+var ALL_DATA = [{"site": "Southern Glazer's - TX", "onoff": "Off-Premise", "item": "AGUASOL TEQ BLANCO 80 1L", "dep": 1801.77868, "acs": 164.0, "ros": 16.47967479878, "purch": 540.0, "months": 279.0, "v9l": 1089.11155, "vacs": 31.0, "vros": 8.442080813818, "vpurch": 222.0, "vmonths": 104.0, "pct": 1.52821914208, "pacs": 0.233083, "pros": 1.05032436692, "ppurch": 0.698113, "pmonths": 0.594286}, {"site": "Southern Glazer's - TX", "onoff": "Off-Premise", "item": "AGUASOL TEQ BLANCO 80 750ML", "dep": 771.33334, "acs": 493.0, "ros": 3.129141310345, "purch": 1139.0, "months": 826.0, "v9l": -238.0, "vacs": 16.0, "vros": -1.102864278754, "vpurch": 155.0, "vmonths": 132.0, "pct": -0.23579920584, "pacs": 0.033543, "pros": -0.260600855914, "ppurch": 0.15752, "pmonths": 0.190202}, {"site": "Southern Glazer's - TX", "onoff": "Off-Premise", "item": "AGUASOL TEQ REPOSADO 80 1L", "dep": 580.00077, "acs": 155.0, "ros": 5.612903225806, "purch": 369.0, "months": 237.0, "v9l": 310.66741, "vacs": 130.0, "vros": -10.547096774194, "vpurch": 297.0, "vmonths": 190.0, "pct": 1.15346799223, "pacs": 0.052000000000000005, "pros": -0.652666879591, "ppurch": 0.04125, "pmonths": 0.04042553}, {"site": "Southern Glazer's - TX", "onoff": "Off-Premise", "item": "AGUASOL TEQ REPOSADO 80 750ML", "dep": 413.75, "acs": 361.0, "ros": 2.292243767313, "purch": 641.0, "months": 531.0, "v9l": 27.0, "vacs": 34.0, "vros": -0.073199657763, "vpurch": 40.0, "vmonths": 93.0, "pct": 0.0698125404, "pacs": 0.103976, "pros": -0.030945427393, "ppurch": 0.066556, "pmonths": 0.212329}, {"site": "Southern Glazer's - TX", "onoff": "Off-Premise", "item": "AGUASOL TEQ REPOSADO(LIQUORKING)80 750ML", "dep": 42.0, "acs": 8.0, "ros": 10.5, "purch": 8.0, "months": 8.0, "v9l": 42.0, "vacs": 8.0, "vros": 10.5, "vpurch": 8.0, "vmonths": 8.0, "pct": 1.0, "pacs": 1.0, "pros": 1.0, "ppurch": 1.0, "pmonths": 1.0}, {"site": "Southern Glazer's - TX", "onoff": "Off-Premise", "item": "AGUASOL TEQ BLANCO 80 375ML", "dep": 30.25004, "acs": 51.0, "ros": 1.186274431373, "purch": 85.0, "months": 67.0, "v9l": -40.87498, "vacs": -172.0, "vros": 0.54838206366, "vpurch": -148.0, "vmonths": -157.0, "pct": -0.57469200009, "pacs": -0.7713, "pros": 0.8596780451, "ppurch": -0.635193, "pmonths": -0.700893}, {"site": "Southern Glazer's - TX", "onoff": "Off-Premise", "item": "AGUASOL TEQ REPOSADO 80 375ML", "dep": 26.58334, "acs": 48.0, "ros": 1.107638875, "purch": 72.0, "months": 59.0, "v9l": -31.62501, "vacs": -176.0, "vros": 0.587921620536, "vpurch": -162.0, "vmonths": -167.0, "pct": -0.54330710285, "pacs": -0.785714, "pros": 1.131233599589, "ppurch": -0.692308, "pmonths": -0.738938}, {"site": "Southern Glazer's - TX", "onoff": "Off-Premise", "item": "AGUASOL TEQ BLANCO(WHITELODGING 80 1L", "dep": 12.0, "acs": 1.0, "ros": 18.0, "purch": 4.0, "months": 3.0, "v9l": 10.66666, "vacs": -2.0, "vros": 17.333333333333, "vpurch": 1.0, "vmonths": 0.0, "pct": 0.07999955000219999, "pacs": -0.666667, "pros": 0.25999999999987, "ppurch": 0.333333, "pmonths": 0.0}, {"site": "Southern Glazer's - TX", "onoff": "NoDesc-0", "item": "AGUASOL TEQ BLANCO 80 750ML", "dep": 89.33332, "acs": 4.0, "ros": 44.666667, "purch": 34.0, "months": 7.0, "v9l": 39.16665, "vacs": 3.0, "vros": -55.666666, "vpurch": 0.0, "vmonths": 3.0, "pct": 0.78073051291, "pacs": 0.03, "pros": -0.554817270946, "ppurch": 0.0, "pmonths": 0.75}, {"site": "Southern Glazer's - TX", "onoff": "NoDesc-0", "item": "AGUASOL TEQ REPOSADO 80 750ML", "dep": 26.83331, "acs": 4.0, "ros": 13.41666725, "purch": 29.0, "months": 7.0, "v9l": -1.00003, "vacs": 3.0, "vros": -42.24999875, "vpurch": -2.0, "vmonths": 3.0, "pct": -0.03592921295, "pacs": 0.03, "pros": -0.758982022563, "ppurch": -0.064516, "pmonths": 0.75}, {"site": "Southern Glazer's - TX", "onoff": "NoDesc-0", "item": "AGUASOL TEQ BLANCO 80 1L", "dep": 24.55556, "acs": 1.0, "ros": 36.833333, "purch": 17.0, "months": 4.0, "v9l": 21.11112, "vacs": 0.0, "vros": 31.666666, "vpurch": 8.0, "vmonths": 0.0, "pct": 0.0612904274715, "pacs": 0.0, "pros": 0.06129031733611, "ppurch": 0.888889, "pmonths": 0.0}, {"site": "Southern Glazer's - TX", "onoff": "NoDesc-0", "item": "AGUASOL TEQ REPOSADO 80 1L", "dep": 13.55554, "acs": 1.0, "ros": 20.333333, "purch": 9.0, "months": 4.0, "v9l": 7.1111, "vacs": 0.0, "vros": 10.666666, "vpurch": 2.0, "vmonths": 0.0, "pct": 1.10344731272, "pacs": 0.0, "pros": 1.103448168847, "ppurch": 0.285714, "pmonths": 0.0}, {"site": "Southern Glazer's - TX", "onoff": "NoDesc-0", "item": "AGUASOL TEQ BLANCO 80 375ML", "dep": 4.625, "acs": 1.0, "ros": 9.25, "purch": 6.0, "months": 4.0, "v9l": -4.375, "vacs": 0.0, "vros": -8.75, "vpurch": -7.0, "vmonths": 0.0, "pct": -0.48611111111, "pacs": 0.0, "pros": -0.486111111111, "ppurch": -0.538462, "pmonths": 0.0}, {"site": "Southern Glazer's - TX", "onoff": "NoDesc-0", "item": "AGUASOL TEQ REPOSADO 80 375ML", "dep": 2.125, "acs": 1.0, "ros": 4.25, "purch": 3.0, "months": 2.0, "v9l": -2.83333, "vacs": 0.0, "vros": -5.666667, "vpurch": -8.0, "vmonths": -2.0, "pct": -0.57142828331, "pacs": 0.0, "pros": -0.571428585834, "ppurch": -0.727273, "pmonths": -0.5}, {"site": "Southern Glazer's - TX", "onoff": "Non-Retail", "item": "AGUASOL TEQ BLANCO 80 750ML", "dep": 2.5, "acs": 2.0, "ros": 2.5, "purch": 3.0, "months": 3.0, "v9l": 2.25, "vacs": 1.0, "vros": 2.0, "vpurch": 2.0, "vmonths": 2.0, "pct": 0.09, "pacs": 1.0, "pros": 0.04, "ppurch": 2.0, "pmonths": 2.0}, {"site": "Southern Glazer's - TX", "onoff": "Non-Retail", "item": "AGUASOL TEQ REPOSADO 80 750ML", "dep": 2.0, "acs": 1.0, "ros": 4.0, "purch": 2.0, "months": 2.0, "v9l": 1.75, "vacs": 0.0, "vros": 3.5, "vpurch": 1.0, "vmonths": 1.0, "pct": 0.07, "pacs": 0.0, "pros": 0.07, "ppurch": 1.0, "pmonths": 1.0}, {"site": "Southern Glazer's - TX", "onoff": "On-Premise", "item": "AGUASOL TEQ REPOSADO 80 750ML", "dep": 0.75, "acs": 1.0, "ros": 1.5, "purch": 2.0, "months": 2.0, "v9l": 0.5, "vacs": 0.0, "vros": 1.0, "vpurch": 1.0, "vmonths": 1.0, "pct": 2.0, "pacs": 0.0, "pros": 2.0, "ppurch": 1.0, "pmonths": 1.0}, {"site": "Southern Glazer's - TX", "onoff": "On-Premise", "item": "AGUASOL TEQ BLANCO 80 750ML", "dep": 0.25, "acs": 1.0, "ros": 0.5, "purch": 1.0, "months": 1.0, "v9l": 0.0, "vacs": 0.0, "vros": 0.0, "vpurch": 0.0, "vmonths": 0.0, "pct": 0.0, "pacs": 0.0, "pros": 0.0, "ppurch": 0.0, "pmonths": 0.0}, {"site": "Southern Glazer's - IL", "onoff": "On-Premise", "item": "AGUASOL TEQ BLANCO 80 1L", "dep": 145.11105, "acs": 47.0, "ros": 4.631205808511, "purch": 79.0, "months": 62.0, "v9l": 77.77782, "vacs": -59.0, "vros": 3.678375346247, "vpurch": -28.0, "vmonths": -44.0, "pct": 1.15511791132, "pacs": -0.556604, "pros": 0.03860472027213, "ppurch": -0.261682, "pmonths": -0.415094}, {"site": "Southern Glazer's - IL", "onoff": "On-Premise", "item": "AGUASOL TEQ BLANCO 80 750ML", "dep": 37.99996, "acs": 25.0, "ros": 3.04000016, "purch": 53.0, "months": 39.0, "v9l": -99.91654, "vacs": -52.0, "vros": -0.542251138701, "vpurch": -68.0, "vmonths": -58.0, "pct": -0.72447125616, "pacs": -0.675325, "pros": -0.15137160782, "ppurch": -0.561983, "pmonths": -0.597938}, {"site": "Southern Glazer's - IL", "onoff": "On-Premise", "item": "AGUASOL TEQ REPOSADO 80 1L", "dep": 37.22219, "acs": 29.0, "ros": 1.925287344828, "purch": 39.0, "months": 35.0, "v9l": 20.11113, "vacs": -14.0, "vros": 1.328387856456, "vpurch": -4.0, "vmonths": -8.0, "pct": 1.17532928994, "pacs": -0.325581, "pros": 0.022254799716429997, "ppurch": -0.093023, "pmonths": -0.186047}, {"site": "Southern Glazer's - IL", "onoff": "On-Premise", "item": "AGUASOL TEQ REPOSADO 80 750ML", "dep": 10.16665, "acs": 11.0, "ros": 1.848485, "purch": 17.0, "months": 16.0, "v9l": -30.83327, "vacs": -42.0, "vros": 0.301315037736, "vpurch": -56.0, "vmonths": -52.0, "pct": -0.75203244299, "pacs": -0.792453, "pros": 0.194752383439, "ppurch": -0.767123, "pmonths": -0.764706}, {"site": "Southern Glazer's - IL", "onoff": "Off-Premise", "item": "AGUASOL TEQ BLANCO 80 750ML", "dep": 44.91667, "acs": 60.0, "ros": 1.497222216667, "purch": 85.0, "months": 75.0, "v9l": 11.75001, "vacs": -4.0, "vros": 0.460763872917, "vpurch": 3.0, "vmonths": -2.0, "pct": 0.3542717295, "pacs": -0.0625, "pros": 0.444556094025, "ppurch": 0.036585, "pmonths": -0.025974}, {"site": "Southern Glazer's - IL", "onoff": "Off-Premise", "item": "AGUASOL TEQ REPOSADO 80 750ML", "dep": 38.41667, "acs": 56.0, "ros": 1.372023803571, "purch": 74.0, "months": 67.0, "v9l": 7.75001, "vacs": -9.0, "vros": 0.428434049725, "vpurch": -3.0, "vmonths": -6.0, "pct": 0.25271777233, "pacs": -0.138462, "pros": 0.454046949936, "ppurch": -0.038961, "pmonths": -0.082192}, {"site": "Southern Glazer's - IL", "onoff": "Off-Premise", "item": "AGUASOL TEQ BLANCO 80 375ML", "dep": 3.0, "acs": 4.0, "ros": 1.5, "purch": 6.0, "months": 5.0, "v9l": 0.70833, "vacs": -1.0, "vros": 0.5833334, "vpurch": -1.0, "vmonths": -1.0, "pct": 0.30908900496, "pacs": -0.2, "pros": 0.636363755372, "ppurch": -0.142857, "pmonths": -0.166667}, {"site": "Southern Glazer's - IL", "onoff": "Off-Premise", "item": "AGUASOL TEQ REPOSADO 80 1L", "dep": 2.33333, "acs": 1.0, "ros": 3.5, "purch": 2.0, "months": 2.0, "v9l": 1.55555, "vacs": -1.0, "vros": 2.9166665, "vpurch": 0.0, "vmonths": 0.0, "pct": 1.99998714289, "pacs": -0.5, "pros": 0.049999982857149995, "ppurch": 0.0, "pmonths": 0.0}, {"site": "Southern Glazer's - IL", "onoff": "Off-Premise", "item": "AGUASOL TEQ BLANCO 80 1L", "dep": 1.66666, "acs": 1.0, "ros": 2.5, "purch": 2.0, "months": 2.0, "v9l": 0.22222, "vacs": -1.0, "vros": 1.4166665, "vpurch": 0.0, "vmonths": 0.0, "pct": 0.15384508875, "pacs": -0.5, "pros": 1.307691952663, "ppurch": 0.0, "pmonths": 0.0}, {"site": "Southern Glazer's - IL", "onoff": "Off-Premise", "item": "AGUASOL TEQ REPOSADO 80 375ML", "dep": 0.875, "acs": 4.0, "ros": 0.4375, "purch": 4.0, "months": 4.0, "v9l": -1.41667, "vacs": -1.0, "vros": -0.4791666, "vpurch": -3.0, "vmonths": -2.0, "pct": -0.61818237355, "pacs": -0.2, "pros": -0.522727238017, "ppurch": -0.428571, "pmonths": -0.333333}, {"site": "Southern Glazer's - FL", "onoff": "On-Premise", "item": "AGUASOL TEQ BLANCO 80 1L", "dep": 116.66667, "acs": 94.0, "ros": 1.861702148936, "purch": 194.0, "months": 146.0, "v9l": 116.66667, "vacs": 94.0, "vros": 1.861702148936, "vpurch": 194.0, "vmonths": 146.0, "pct": 1.0, "pacs": 1.0, "pros": 1.0, "ppurch": 1.0, "pmonths": 1.0}, {"site": "Southern Glazer's - FL", "onoff": "On-Premise", "item": "AGUASOL TEQ REPOSADO 80 1L", "dep": 66.55544, "acs": 96.0, "ros": 1.03993065625, "purch": 153.0, "months": 130.0, "v9l": 66.55544, "vacs": 96.0, "vros": 1.03993065625, "vpurch": 153.0, "vmonths": 130.0, "pct": 1.0, "pacs": 1.0, "pros": 1.0, "ppurch": 1.0, "pmonths": 1.0}, {"site": "Southern Glazer's - FL", "onoff": "On-Premise", "item": "AGUASOL TEQ REPOSADO 80 750ML", "dep": 47.49997, "acs": 30.0, "ros": 3.166666766667, "purch": 55.0, "months": 41.0, "v9l": 47.49997, "vacs": 30.0, "vros": 3.166666766667, "vpurch": 55.0, "vmonths": 41.0, "pct": 1.0, "pacs": 1.0, "pros": 1.0, "ppurch": 1.0, "pmonths": 1.0}, {"site": "Southern Glazer's - FL", "onoff": "On-Premise", "item": "AGUASOL TEQ BLANCO 80 750ML", "dep": 37.33333, "acs": 22.0, "ros": 3.393939409091, "purch": 38.0, "months": 32.0, "v9l": 37.33333, "vacs": 22.0, "vros": 3.393939409091, "vpurch": 38.0, "vmonths": 32.0, "pct": 1.0, "pacs": 1.0, "pros": 1.0, "ppurch": 1.0, "pmonths": 1.0}, {"site": "Southern Glazer's - FL", "onoff": "On-Premise", "item": "AGUASOL TEQ REPOSADO 80 375ML", "dep": 1.08333, "acs": 2.0, "ros": 1.0833335, "purch": 2.0, "months": 2.0, "v9l": 1.08333, "vacs": 2.0, "vros": 1.0833335, "vpurch": 2.0, "vmonths": 2.0, "pct": 1.0, "pacs": 1.0, "pros": 1.0, "ppurch": 1.0, "pmonths": 1.0}, {"site": "Southern Glazer's - FL", "onoff": "On-Premise", "item": "AGUASOL TEQ BLANCO 80 375ML", "dep": 1.08333, "acs": 2.0, "ros": 1.0833335, "purch": 2.0, "months": 2.0, "v9l": 1.08333, "vacs": 2.0, "vros": 1.0833335, "vpurch": 2.0, "vmonths": 2.0, "pct": 1.0, "pacs": 1.0, "pros": 1.0, "ppurch": 1.0, "pmonths": 1.0}, {"site": "Southern Glazer's - FL", "onoff": "Off-Premise", "item": "AGUASOL TEQ REPOSADO 80 750ML", "dep": 98.16663, "acs": 68.0, "ros": 2.887254955882, "purch": 145.0, "months": 96.0, "v9l": 98.16663, "vacs": 68.0, "vros": 2.887254955882, "vpurch": 145.0, "vmonths": 96.0, "pct": 1.0, "pacs": 1.0, "pros": 1.0, "ppurch": 1.0, "pmonths": 1.0}, {"site": "Southern Glazer's - FL", "onoff": "Off-Premise", "item": "AGUASOL TEQ BLANCO 80 750ML", "dep": 85.16665, "acs": 71.0, "ros": 2.399061056338, "purch": 139.0, "months": 94.0, "v9l": 85.16665, "vacs": 71.0, "vros": 2.399061056338, "vpurch": 139.0, "vmonths": 94.0, "pct": 1.0, "pacs": 1.0, "pros": 1.0, "ppurch": 1.0, "pmonths": 1.0}, {"site": "Southern Glazer's - FL", "onoff": "Off-Premise", "item": "AGUASOL TEQ REPOSADO 80 1L", "dep": 13.44445, "acs": 4.0, "ros": 5.04166675, "purch": 10.0, "months": 8.0, "v9l": 13.44445, "vacs": 4.0, "vros": 5.04166675, "vpurch": 10.0, "vmonths": 8.0, "pct": 1.0, "pacs": 1.0, "pros": 1.0, "ppurch": 1.0, "pmonths": 1.0}, {"site": "Southern Glazer's - FL", "onoff": "Off-Premise", "item": "AGUASOL TEQ BLANCO 80 1L", "dep": 9.44445, "acs": 4.0, "ros": 3.54166675, "purch": 8.0, "months": 6.0, "v9l": 9.44445, "vacs": 4.0, "vros": 3.54166675, "vpurch": 8.0, "vmonths": 6.0, "pct": 1.0, "pacs": 1.0, "pros": 1.0, "ppurch": 1.0, "pmonths": 1.0}, {"site": "Southern Glazer's - FL", "onoff": "Off-Premise", "item": "AGUASOL TEQ REPOSADO 80 375ML", "dep": 2.0, "acs": 3.0, "ros": 1.333333333333, "purch": 4.0, "months": 4.0, "v9l": 2.0, "vacs": 3.0, "vros": 1.333333333333, "vpurch": 4.0, "vmonths": 4.0, "pct": 1.0, "pacs": 1.0, "pros": 1.0, "ppurch": 1.0, "pmonths": 1.0}, {"site": "Southern Glazer's - FL", "onoff": "Off-Premise", "item": "AGUASOL TEQ BLANCO 80 375ML", "dep": 1.5, "acs": 2.0, "ros": 1.5, "purch": 3.0, "months": 3.0, "v9l": 1.5, "vacs": 2.0, "vros": 1.5, "vpurch": 3.0, "vmonths": 3.0, "pct": 1.0, "pacs": 1.0, "pros": 1.0, "ppurch": 1.0, "pmonths": 1.0}, {"site": "Southern Glazer's - FL", "onoff": "NoDesc-0", "item": "AGUASOL TEQ BLANCO 80 1L", "dep": 9.33333, "acs": 6.0, "ros": 2.333333333333, "purch": 6.0, "months": 6.0, "v9l": 9.33333, "vacs": 6.0, "vros": 2.333333333333, "vpurch": 6.0, "vmonths": 6.0, "pct": 1.0, "pacs": 1.0, "pros": 1.0, "ppurch": 1.0, "pmonths": 1.0}, {"site": "Southern Glazer's - FL", "onoff": "NoDesc-0", "item": "AGUASOL TEQ REPOSADO 80 1L", "dep": 7.33333, "acs": 7.0, "ros": 1.571428571429, "purch": 7.0, "months": 7.0, "v9l": 7.33333, "vacs": 7.0, "vros": 1.571428571429, "vpurch": 7.0, "vmonths": 7.0, "pct": 1.0, "pacs": 1.0, "pros": 1.0, "ppurch": 1.0, "pmonths": 1.0}, {"site": "Southern Glazer's - FL", "onoff": "NoDesc-0", "item": "AGUASOL TEQ REPOSADO 80 375ML", "dep": 1.625, "acs": 3.0, "ros": 1.083333333333, "purch": 3.0, "months": 3.0, "v9l": 1.625, "vacs": 3.0, "vros": 1.083333333333, "vpurch": 3.0, "vmonths": 3.0, "pct": 1.0, "pacs": 1.0, "pros": 1.0, "ppurch": 1.0, "pmonths": 1.0}, {"site": "Southern Glazer's - FL", "onoff": "NoDesc-0", "item": "AGUASOL TEQ BLANCO 80 375ML", "dep": 1.58333, "acs": 2.0, "ros": 1.5833335, "purch": 2.0, "months": 2.0, "v9l": 1.58333, "vacs": 2.0, "vros": 1.5833335, "vpurch": 2.0, "vmonths": 2.0, "pct": 1.0, "pacs": 1.0, "pros": 1.0, "ppurch": 1.0, "pmonths": 1.0}, {"site": "Southern Glazer's - FL", "onoff": "NoDesc-0", "item": "AGUASOL TEQ REPOSADO 80 750ML", "dep": 1.25, "acs": 2.0, "ros": 1.25, "purch": 2.0, "months": 2.0, "v9l": 1.25, "vacs": 2.0, "vros": 1.25, "vpurch": 2.0, "vmonths": 2.0, "pct": 1.0, "pacs": 1.0, "pros": 1.0, "ppurch": 1.0, "pmonths": 1.0}, {"site": "Southern Glazer's - FL", "onoff": "NoDesc-0", "item": "AGUASOL TEQ BLANCO 80 750ML", "dep": 0.25, "acs": 1.0, "ros": 0.5, "purch": 1.0, "months": 1.0, "v9l": 0.25, "vacs": 1.0, "vros": 0.5, "vpurch": 1.0, "vmonths": 1.0, "pct": 1.0, "pacs": 1.0, "pros": 1.0, "ppurch": 1.0, "pmonths": 1.0}, {"site": "Southern Glazer's - FL", "onoff": "Non-Retail", "item": "AGUASOL TEQ BLANCO 80 750ML", "dep": 0.5, "acs": 1.0, "ros": 1.0, "purch": 1.0, "months": 1.0, "v9l": 0.5, "vacs": 1.0, "vros": 1.0, "vpurch": 1.0, "vmonths": 1.0, "pct": 1.0, "pacs": 1.0, "pros": 1.0, "ppurch": 1.0, "pmonths": 1.0}, {"site": "Southern Glazer's - CO", "onoff": "On-Premise", "item": "AGUASOL TEQ BLANCO 80 1L", "dep": 50.66665, "acs": 51.0, "ros": 1.490196078431, "purch": 82.0, "months": 69.0, "v9l": 50.66665, "vacs": 51.0, "vros": 1.490196078431, "vpurch": 82.0, "vmonths": 69.0, "pct": 1.0, "pacs": 1.0, "pros": 1.0, "ppurch": 1.0, "pmonths": 1.0}, {"site": "Southern Glazer's - CO", "onoff": "On-Premise", "item": "AGUASOL TEQ BLANCO 80 750ML", "dep": 45.66663, "acs": 44.0, "ros": 2.075757659091, "purch": 77.0, "months": 62.0, "v9l": -13.66661, "vacs": -7.0, "vros": -0.251039909536, "vpurch": -23.0, "vmonths": -22.0, "pct": -0.23033648592, "pacs": -0.137255, "pros": -0.107890739152, "ppurch": -0.23, "pmonths": -0.261905}, {"site": "Southern Glazer's - CO", "onoff": "On-Premise", "item": "AGUASOL TEQ REPOSADO 80 1L", "dep": 39.22219, "acs": 48.0, "ros": 1.2256945, "purch": 64.0, "months": 59.0, "v9l": 39.22219, "vacs": 48.0, "vros": 1.2256945, "vpurch": 64.0, "vmonths": 59.0, "pct": 1.0, "pacs": 1.0, "pros": 1.0, "ppurch": 1.0, "pmonths": 1.0}, {"site": "Southern Glazer's - CO", "onoff": "On-Premise", "item": "AGUASOL TEQ REPOSADO 80 750ML", "dep": 17.91663, "acs": 30.0, "ros": 1.194444566667, "purch": 50.0, "months": 45.0, "v9l": -9.58334, "vacs": -6.0, "vros": -0.333333294444, "vpurch": -10.0, "vmonths": -11.0, "pct": -0.34848547108, "pacs": -0.166667, "pros": -0.218181780826, "ppurch": -0.166667, "pmonths": -0.196429}, {"site": "Southern Glazer's - CO", "onoff": "On-Premise", "item": "AGUASOL TEQ BLANCO AM7 80 1L", "dep": 8.00001, "acs": 1.0, "ros": 12.0, "purch": 3.0, "months": 3.0, "v9l": 8.00001, "vacs": 1.0, "vros": 12.0, "vpurch": 3.0, "vmonths": 3.0, "pct": 1.0, "pacs": 1.0, "pros": 1.0, "ppurch": 1.0, "pmonths": 1.0}, {"site": "Southern Glazer's - CO", "onoff": "Off-Premise", "item": "AGUASOL TEQ BLANCO 80 750ML", "dep": 43.91666, "acs": 49.0, "ros": 1.792517020408, "purch": 68.0, "months": 63.0, "v9l": 14.41666, "vacs": 9.0, "vros": 0.317517020408, "vpurch": 14.0, "vmonths": 12.0, "pct": 0.48870033898, "pacs": 0.225, "pros": 0.215265776548, "ppurch": 0.259259, "pmonths": 0.235294}, {"site": "Southern Glazer's - CO", "onoff": "Off-Premise", "item": "AGUASOL TEQ REPOSADO 80 750ML", "dep": 31.58334, "acs": 40.0, "ros": 1.57916665, "purch": 55.0, "months": 52.0, "v9l": 13.66667, "vacs": 5.0, "vros": 0.555357135714, "vpurch": 12.0, "vmonths": 12.0, "pct": 0.76279074181, "pacs": 0.142857, "pros": 0.542441858534, "ppurch": 0.27907, "pmonths": 0.3}, {"site": "Southern Glazer's - CO", "onoff": "NoDesc-0", "item": "AGUASOL TEQ REPOSADO 80 750ML", "dep": 4.16667, "acs": 1.0, "ros": 8.333333, "purch": 6.0, "months": 3.0, "v9l": -1.41666, "vacs": -2.0, "vros": 4.611110666667, "vpurch": -2.0, "vmonths": -2.0, "pct": -0.25373030073, "pacs": -0.666667, "pros": 1.238805813767, "ppurch": -0.25, "pmonths": -0.4}, {"site": "Southern Glazer's - CO", "onoff": "NoDesc-0", "item": "AGUASOL TEQ BLANCO 80 750ML", "dep": 2.83333, "acs": 3.0, "ros": 1.888889, "purch": 7.0, "months": 5.0, "v9l": -2.83333, "vacs": -2.0, "vros": -0.3777778, "vpurch": -2.0, "vmonths": -2.0, "pct": -0.5, "pacs": -0.4, "pros": -0.166666666667, "ppurch": -0.222222, "pmonths": -0.285714}, {"site": "Southern Glazer's - CO", "onoff": "NoDesc-0", "item": "AGUASOL TEQ REPOSADO 80 1L", "dep": 0.77778, "acs": 2.0, "ros": 0.5833335, "purch": 2.0, "months": 2.0, "v9l": 0.77778, "vacs": 2.0, "vros": 0.5833335, "vpurch": 2.0, "vmonths": 2.0, "pct": 1.0, "pacs": 1.0, "pros": 1.0, "ppurch": 1.0, "pmonths": 1.0}, {"site": "Southern Glazer's - CO", "onoff": "Non-Retail", "item": "AGUASOL TEQ REPOSADO 80 1L", "dep": 0.55555, "acs": 2.0, "ros": 0.4166675, "purch": 5.0, "months": 4.0, "v9l": 0.55555, "vacs": 2.0, "vros": 0.4166675, "vpurch": 5.0, "vmonths": 4.0, "pct": 1.0, "pacs": 1.0, "pros": 1.0, "ppurch": 1.0, "pmonths": 1.0}, {"site": "Southern Glazer's - CO", "onoff": "Non-Retail", "item": "AGUASOL TEQ BLANCO 80 1L", "dep": 0.11111, "acs": 1.0, "ros": 0.166667, "purch": 1.0, "months": 1.0, "v9l": 0.11111, "vacs": 1.0, "vros": 0.166667, "vpurch": 1.0, "vmonths": 1.0, "pct": 1.0, "pacs": 1.0, "pros": 1.0, "ppurch": 1.0, "pmonths": 1.0}, {"site": "Southern Glazer's - MD", "onoff": "Off-Premise", "item": "AGUASOL TEQ REPOSADO 80 750ML", "dep": 44.49998, "acs": 58.0, "ros": 1.534482793103, "purch": 76.0, "months": 73.0, "v9l": 44.49998, "vacs": 58.0, "vros": 1.534482793103, "vpurch": 76.0, "vmonths": 73.0, "pct": 1.0, "pacs": 1.0, "pros": 1.0, "ppurch": 1.0, "pmonths": 1.0}, {"site": "Southern Glazer's - MD", "onoff": "Off-Premise", "item": "AGUASOL TEQ BLANCO 80 750ML", "dep": 26.33332, "acs": 47.0, "ros": 1.120567404255, "purch": 57.0, "months": 57.0, "v9l": 26.33332, "vacs": 47.0, "vros": 1.120567404255, "vpurch": 57.0, "vmonths": 57.0, "pct": 1.0, "pacs": 1.0, "pros": 1.0, "ppurch": 1.0, "pmonths": 1.0}, {"site": "Southern Glazer's - MD", "onoff": "Off-Premise", "item": "AGUASOL TEQ REPOSADO 80 1L", "dep": 0.77778, "acs": 2.0, "ros": 0.5833335, "purch": 2.0, "months": 2.0, "v9l": 0.77778, "vacs": 2.0, "vros": 0.5833335, "vpurch": 2.0, "vmonths": 2.0, "pct": 1.0, "pacs": 1.0, "pros": 1.0, "ppurch": 1.0, "pmonths": 1.0}, {"site": "Southern Glazer's - MD", "onoff": "Off-Premise", "item": "AGUASOL TEQ BLANCO 80 1L", "dep": 0.11111, "acs": 1.0, "ros": 0.166667, "purch": 1.0, "months": 1.0, "v9l": 0.11111, "vacs": 1.0, "vros": 0.166667, "vpurch": 1.0, "vmonths": 1.0, "pct": 1.0, "pacs": 1.0, "pros": 1.0, "ppurch": 1.0, "pmonths": 1.0}, {"site": "Southern Glazer's - MD", "onoff": "On-Premise", "item": "AGUASOL TEQ BLANCO 80 1L", "dep": 4.33333, "acs": 3.0, "ros": 2.166666666667, "purch": 3.0, "months": 3.0, "v9l": 4.33333, "vacs": 3.0, "vros": 2.166666666667, "vpurch": 3.0, "vmonths": 3.0, "pct": 1.0, "pacs": 1.0, "pros": 1.0, "ppurch": 1.0, "pmonths": 1.0}, {"site": "Southern Glazer's - MD", "onoff": "On-Premise", "item": "AGUASOL TEQ REPOSADO 80 750ML", "dep": 3.5, "acs": 10.0, "ros": 0.7, "purch": 17.0, "months": 14.0, "v9l": 3.5, "vacs": 10.0, "vros": 0.7, "vpurch": 17.0, "vmonths": 14.0, "pct": 1.0, "pacs": 1.0, "pros": 1.0, "ppurch": 1.0, "pmonths": 1.0}, {"site": "Southern Glazer's - MD", "onoff": "On-Premise", "item": "AGUASOL TEQ BLANCO 80 750ML", "dep": 3.0, "acs": 8.0, "ros": 0.75, "purch": 12.0, "months": 12.0, "v9l": 3.0, "vacs": 8.0, "vros": 0.75, "vpurch": 12.0, "vmonths": 12.0, "pct": 1.0, "pacs": 1.0, "pros": 1.0, "ppurch": 1.0, "pmonths": 1.0}, {"site": "Southern Glazer's - MD", "onoff": "On-Premise", "item": "AGUASOL TEQ REPOSADO 80 1L", "dep": 0.22222, "acs": 1.0, "ros": 0.333333, "purch": 1.0, "months": 1.0, "v9l": 0.22222, "vacs": 1.0, "vros": 0.333333, "vpurch": 1.0, "vmonths": 1.0, "pct": 1.0, "pacs": 1.0, "pros": 1.0, "ppurch": 1.0, "pmonths": 1.0}, {"site": "Southern Glazer's - MD", "onoff": "NoDesc-0", "item": "AGUASOL TEQ REPOSADO 80 750ML", "dep": 1.6666, "acs": 12.0, "ros": 0.277778333333, "purch": 20.0, "months": 16.0, "v9l": 1.6666, "vacs": 12.0, "vros": 0.277778333333, "vpurch": 20.0, "vmonths": 16.0, "pct": 1.0, "pacs": 1.0, "pros": 1.0, "ppurch": 1.0, "pmonths": 1.0}, {"site": "Southern Glazer's - MD", "onoff": "NoDesc-0", "item": "AGUASOL TEQ BLANCO 80 750ML", "dep": 1.24995, "acs": 11.0, "ros": 0.227273181818, "purch": 15.0, "months": 12.0, "v9l": 1.24995, "vacs": 11.0, "vros": 0.227273181818, "vpurch": 15.0, "vmonths": 12.0, "pct": 1.0, "pacs": 1.0, "pros": 1.0, "ppurch": 1.0, "pmonths": 1.0}, {"site": "Southern Glazer's - MD", "onoff": "NoDesc-0", "item": "AGUASOL TEQ REPOSADO 80 1L", "dep": 0.33333, "acs": 3.0, "ros": 0.166667, "purch": 3.0, "months": 3.0, "v9l": 0.33333, "vacs": 3.0, "vros": 0.166667, "vpurch": 3.0, "vmonths": 3.0, "pct": 1.0, "pacs": 1.0, "pros": 1.0, "ppurch": 1.0, "pmonths": 1.0}, {"site": "Southern Glazer's - MD", "onoff": "NoDesc-0", "item": "AGUASOL TEQ BLANCO 80 1L", "dep": 0.22222, "acs": 2.0, "ros": 0.166667, "purch": 2.0, "months": 2.0, "v9l": 0.22222, "vacs": 2.0, "vros": 0.166667, "vpurch": 2.0, "vmonths": 2.0, "pct": 1.0, "pacs": 1.0, "pros": 1.0, "ppurch": 1.0, "pmonths": 1.0}, {"site": "Southern Glazer's - MD", "onoff": "Non-Retail", "item": "AGUASOL TEQ REPOSADO 80 750ML", "dep": 1.58327, "acs": 13.0, "ros": 0.243590230769, "purch": 21.0, "months": 19.0, "v9l": 1.58327, "vacs": 13.0, "vros": 0.243590230769, "vpurch": 21.0, "vmonths": 19.0, "pct": 1.0, "pacs": 1.0, "pros": 1.0, "ppurch": 1.0, "pmonths": 1.0}, {"site": "Southern Glazer's - MD", "onoff": "Non-Retail", "item": "AGUASOL TEQ BLANCO 80 750ML", "dep": 1.49994, "acs": 14.0, "ros": 0.214286142857, "purch": 19.0, "months": 18.0, "v9l": 1.49994, "vacs": 14.0, "vros": 0.214286142857, "vpurch": 19.0, "vmonths": 18.0, "pct": 1.0, "pacs": 1.0, "pros": 1.0, "ppurch": 1.0, "pmonths": 1.0}, {"site": "Southern Glazer's - MD", "onoff": "Non-Retail", "item": "AGUASOL TEQ BLANCO 80 1L", "dep": 0.33333, "acs": 3.0, "ros": 0.166667, "purch": 3.0, "months": 3.0, "v9l": 0.33333, "vacs": 3.0, "vros": 0.166667, "vpurch": 3.0, "vmonths": 3.0, "pct": 1.0, "pacs": 1.0, "pros": 1.0, "ppurch": 1.0, "pmonths": 1.0}, {"site": "Southern Glazer's - MD", "onoff": "Non-Retail", "item": "AGUASOL TEQ REPOSADO 80 1L", "dep": 0.33333, "acs": 3.0, "ros": 0.166667, "purch": 3.0, "months": 3.0, "v9l": 0.33333, "vacs": 3.0, "vros": 0.166667, "vpurch": 3.0, "vmonths": 3.0, "pct": 1.0, "pacs": 1.0, "pros": 1.0, "ppurch": 1.0, "pmonths": 1.0}, {"site": "Southern Glazer's - OK", "onoff": "Off-Premise", "item": "AGUASOL TEQ REPOSADO 80 750ML", "dep": 9.0, "acs": 18.0, "ros": 1.0, "purch": 20.0, "months": 18.0, "v9l": 9.0, "vacs": 18.0, "vros": 1.0, "vpurch": 20.0, "vmonths": 18.0, "pct": 1.0, "pacs": 1.0, "pros": 1.0, "ppurch": 1.0, "pmonths": 1.0}, {"site": "Southern Glazer's - OK", "onoff": "Off-Premise", "item": "AGUASOL TEQ BLANCO 80 750ML", "dep": 6.75, "acs": 16.0, "ros": 0.84375, "purch": 16.0, "months": 16.0, "v9l": 6.75, "vacs": 16.0, "vros": 0.84375, "vpurch": 16.0, "vmonths": 16.0, "pct": 1.0, "pacs": 1.0, "pros": 1.0, "ppurch": 1.0, "pmonths": 1.0}, {"site": "Southern Glazer's - OK", "onoff": "Off-Premise", "item": "AGUASOL TEQ REPOSADO 80 375ML", "dep": 0.875, "acs": 4.0, "ros": 0.4375, "purch": 4.0, "months": 4.0, "v9l": 0.875, "vacs": 4.0, "vros": 0.4375, "vpurch": 4.0, "vmonths": 4.0, "pct": 1.0, "pacs": 1.0, "pros": 1.0, "ppurch": 1.0, "pmonths": 1.0}, {"site": "Southern Glazer's - OK", "onoff": "Off-Premise", "item": "AGUASOL TEQ BLANCO 80 375ML", "dep": 0.875, "acs": 4.0, "ros": 0.4375, "purch": 4.0, "months": 4.0, "v9l": 0.875, "vacs": 4.0, "vros": 0.4375, "vpurch": 4.0, "vmonths": 4.0, "pct": 1.0, "pacs": 1.0, "pros": 1.0, "ppurch": 1.0, "pmonths": 1.0}, {"site": "Southern Glazer's - OK", "onoff": "On-Premise", "item": "AGUASOL TEQ BLANCO 80 1L", "dep": 1.55555, "acs": 3.0, "ros": 0.777778, "purch": 3.0, "months": 3.0, "v9l": 1.55555, "vacs": 3.0, "vros": 0.777778, "vpurch": 3.0, "vmonths": 3.0, "pct": 1.0, "pacs": 1.0, "pros": 1.0, "ppurch": 1.0, "pmonths": 1.0}, {"site": "Southern Glazer's - OK", "onoff": "On-Premise", "item": "AGUASOL TEQ REPOSADO 80 1L", "dep": 0.33333, "acs": 3.0, "ros": 0.166667, "purch": 3.0, "months": 3.0, "v9l": 0.33333, "vacs": 3.0, "vros": 0.166667, "vpurch": 3.0, "vmonths": 3.0, "pct": 1.0, "pacs": 1.0, "pros": 1.0, "ppurch": 1.0, "pmonths": 1.0}, {"site": "Southern Glazer's - OK", "onoff": "NoDesc-0", "item": "AGUASOL TEQ BLANCO 80 375ML", "dep": 1.54167, "acs": 1.0, "ros": 3.083333, "purch": 2.0, "months": 1.0, "v9l": 1.54167, "vacs": 1.0, "vros": 3.083333, "vpurch": 2.0, "vmonths": 1.0, "pct": 1.0, "pacs": 1.0, "pros": 1.0, "ppurch": 1.0, "pmonths": 1.0}, {"site": "Southern Glazer's - OK", "onoff": "NoDesc-0", "item": "AGUASOL TEQ REPOSADO 80 375ML", "dep": 1.54167, "acs": 1.0, "ros": 3.083333, "purch": 2.0, "months": 1.0, "v9l": 1.54167, "vacs": 1.0, "vros": 3.083333, "vpurch": 2.0, "vmonths": 1.0, "pct": 1.0, "pacs": 1.0, "pros": 1.0, "ppurch": 1.0, "pmonths": 1.0}, {"site": "Southern Glazer's - OK", "onoff": "NoDesc-0", "item": "AGUASOL TEQ BLANCO 80 750ML", "dep": 1.0, "acs": 1.0, "ros": 2.0, "purch": 2.0, "months": 1.0, "v9l": 1.0, "vacs": 1.0, "vros": 2.0, "vpurch": 2.0, "vmonths": 1.0, "pct": 1.0, "pacs": 1.0, "pros": 1.0, "ppurch": 1.0, "pmonths": 1.0}, {"site": "Southern Glazer's - OK", "onoff": "NoDesc-0", "item": "AGUASOL TEQ REPOSADO 80 750ML", "dep": 1.0, "acs": 1.0, "ros": 2.0, "purch": 2.0, "months": 1.0, "v9l": 1.0, "vacs": 1.0, "vros": 2.0, "vpurch": 2.0, "vmonths": 1.0, "pct": 1.0, "pacs": 1.0, "pros": 1.0, "ppurch": 1.0, "pmonths": 1.0}, {"site": "Southern Glazer's - DC", "onoff": "Off-Premise", "item": "AGUASOL TEQ REPOSADO 80 750ML", "dep": 8.25, "acs": 7.0, "ros": 2.357142857143, "purch": 11.0, "months": 9.0, "v9l": 8.25, "vacs": 7.0, "vros": 2.357142857143, "vpurch": 11.0, "vmonths": 9.0, "pct": 1.0, "pacs": 1.0, "pros": 1.0, "ppurch": 1.0, "pmonths": 1.0}, {"site": "Southern Glazer's - DC", "onoff": "Off-Premise", "item": "AGUASOL TEQ BLANCO 80 750ML", "dep": 2.5, "acs": 3.0, "ros": 1.666666666667, "purch": 4.0, "months": 3.0, "v9l": 2.5, "vacs": 3.0, "vros": 1.666666666667, "vpurch": 4.0, "vmonths": 3.0, "pct": 1.0, "pacs": 1.0, "pros": 1.0, "ppurch": 1.0, "pmonths": 1.0}, {"site": "Southern Glazer's - DC", "onoff": "Off-Premise", "item": "AGUASOL TEQ BLANCO 80 1L", "dep": 0.11111, "acs": 1.0, "ros": 0.166667, "purch": 1.0, "months": 1.0, "v9l": 0.11111, "vacs": 1.0, "vros": 0.166667, "vpurch": 1.0, "vmonths": 1.0, "pct": 1.0, "pacs": 1.0, "pros": 1.0, "ppurch": 1.0, "pmonths": 1.0}, {"site": "Southern Glazer's - DC", "onoff": "Non-Retail", "item": "AGUASOL TEQ BLANCO 80 750ML", "dep": 1.08333, "acs": 1.0, "ros": 2.166667, "purch": 2.0, "months": 2.0, "v9l": 1.08333, "vacs": 1.0, "vros": 2.166667, "vpurch": 2.0, "vmonths": 2.0, "pct": 1.0, "pacs": 1.0, "pros": 1.0, "ppurch": 1.0, "pmonths": 1.0}, {"site": "Southern Glazer's - DC", "onoff": "Non-Retail", "item": "AGUASOL TEQ REPOSADO 80 750ML", "dep": 1.08333, "acs": 1.0, "ros": 2.166667, "purch": 2.0, "months": 2.0, "v9l": 1.08333, "vacs": 1.0, "vros": 2.166667, "vpurch": 2.0, "vmonths": 2.0, "pct": 1.0, "pacs": 1.0, "pros": 1.0, "ppurch": 1.0, "pmonths": 1.0}, {"site": "Southern Glazer's - DC", "onoff": "On-Premise", "item": "AGUASOL TEQ BLANCO 80 1L", "dep": 1.0, "acs": 4.0, "ros": 0.37500025, "purch": 4.0, "months": 4.0, "v9l": 1.0, "vacs": 4.0, "vros": 0.37500025, "vpurch": 4.0, "vmonths": 4.0, "pct": 1.0, "pacs": 1.0, "pros": 1.0, "ppurch": 1.0, "pmonths": 1.0}, {"site": "Southern Glazer's - DC", "onoff": "On-Premise", "item": "AGUASOL TEQ REPOSADO 80 1L", "dep": 0.66667, "acs": 1.0, "ros": 1.0, "purch": 1.0, "months": 1.0, "v9l": 0.66667, "vacs": 1.0, "vros": 1.0, "vpurch": 1.0, "vmonths": 1.0, "pct": 1.0, "pacs": 1.0, "pros": 1.0, "ppurch": 1.0, "pmonths": 1.0}, {"site": "Southern Glazer's - DC", "onoff": "On-Premise", "item": "AGUASOL TEQ REPOSADO 80 750ML", "dep": 0.16666, "acs": 2.0, "ros": 0.166667, "purch": 2.0, "months": 2.0, "v9l": 0.16666, "vacs": 2.0, "vros": 0.166667, "vpurch": 2.0, "vmonths": 2.0, "pct": 1.0, "pacs": 1.0, "pros": 1.0, "ppurch": 1.0, "pmonths": 1.0}, {"site": "Southern Glazer's - DC", "onoff": "On-Premise", "item": "AGUASOL TEQ BLANCO 80 750ML", "dep": 0.16666, "acs": 2.0, "ros": 0.166667, "purch": 2.0, "months": 2.0, "v9l": 0.16666, "vacs": 2.0, "vros": 0.166667, "vpurch": 2.0, "vmonths": 2.0, "pct": 1.0, "pacs": 1.0, "pros": 1.0, "ppurch": 1.0, "pmonths": 1.0}];
+
+// Populate dropdown
+var selSite = document.getElementById('siteSelect');
+var sites = [];
+ALL_DATA.forEach(function(d) {
+  if (sites.indexOf(d.site) === -1) sites.push(d.site);
+});
+sites.sort();
+sites.forEach(function(s) {
+  var opt = document.createElement('option');
+  opt.value = s;
+  opt.textContent = s;
+  selSite.appendChild(opt);
+});
+
+// Color scale
+var maxPct = 0.30;
+function vColor(v) {
+  if (v === null || v === undefined) return '#444';
+  var t = Math.min(Math.abs(v) / maxPct, 1);
+  if (v > 0) {
+    return 'rgb(' + Math.round(28+(1-t)*50) + ',' + Math.round(70+t*165) + ',' + Math.round(28+(1-t)*50) + ')';
+  } else if (v < 0) {
+    return 'rgb(' + Math.round(100+t*155) + ',' + Math.round(40*(1-t)) + ',' + Math.round(40*(1-t)) + ')';
+  }
+  return 'rgb(70,70,70)';
+}
+
+var canvas = document.getElementById('legendBar');
+canvas.width = 260; canvas.height = 12;
+var ctx = canvas.getContext('2d');
+for (var x = 0; x < 260; x++) {
+  var v = -maxPct + (x / 259) * maxPct * 2;
+  ctx.fillStyle = vColor(v);
+  ctx.fillRect(x, 0, 1, 12);
+}
+
+// Helpers
+function fmt(n) { return n == null ? 'N/A' : n.toLocaleString('en-US', {maximumFractionDigits: 0}); }
+function fmt1(n) { return n == null ? 'N/A' : n.toLocaleString('en-US', {minimumFractionDigits: 1, maximumFractionDigits: 1}); }
+function fmt2(n) { return n == null ? 'N/A' : n.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}); }
+function fmtPct(v) { return v == null ? 'N/A' : (v >= 0 ? '+' : '') + (v * 100).toFixed(1) + '%'; }
+function fmtVar(v) { return v == null ? 'N/A' : (v >= 0 ? '+' : '') + fmt1(v); }
+function cls(v) { return v == null ? 'neu' : v > 0 ? 'pos' : v < 0 ? 'neg' : 'neu'; }
+
+function metricRow(label, val, varVal, varPct, valFmt) {
+  return '<tr>' +
+    '<td>' + label + '</td>' +
+    '<td class="val">' + valFmt + '</td>' +
+    '<td class="var ' + cls(varVal) + '">' + fmtVar(varVal) + '</td>' +
+    '<td class="varp ' + cls(varPct) + '">' + fmtPct(varPct) + '</td>' +
+    '</tr>';
+}
+
+// Draw treemap
+var tooltip = document.getElementById('tooltip');
+
+function drawTreemap() {
+  var siteFilter = selSite.value;
+  var filtered = ALL_DATA.filter(function(d) { return d.site === siteFilter; });
+
+  var sliderVal = parseInt(document.getElementById('sizeSlider').value);
+  var width = 700;
+  var height = Math.round(sliderVal * 700 / 800);
+
+  // Group by OnOff Premises
+  var groupMap = new Map();
+  filtered.forEach(function(d) {
+    if (!groupMap.has(d.onoff)) groupMap.set(d.onoff, []);
+    groupMap.get(d.onoff).push(d);
+  });
+
+  var hierData = {
+    name: "Root",
+    children: Array.from(groupMap, function(entry) { return { name: entry[0], children: entry[1] }; })
+  };
+
+  d3.select('#treemap').selectAll('*').remove();
+
+  var svg = d3.select('#treemap')
+    .append('svg')
+    .attr('viewBox', '0 0 ' + width + ' ' + height)
+    .attr('preserveAspectRatio', 'xMidYMid meet')
+    .style('width', '100%')
+    .style('height', 'auto');
+
+  var root = d3.hierarchy(hierData)
+    .sum(function(d) { return d.dep || 0; })
+    .sort(function(a, b) { return b.value - a.value; });
+
+  d3.treemap()
+    .size([width, height])
+    .paddingTop(16)
+    .paddingInner(3)
+    .paddingOuter(2)
+    .round(true)(root);
+
+  // Sector borders
+  svg.selectAll('.sector-border-rect')
+    .data(root.children)
+    .join('rect')
+    .attr('class', 'sector-border')
+    .attr('x', function(d) { return d.x0; }).attr('y', function(d) { return d.y0; })
+    .attr('width', function(d) { return d.x1 - d.x0; }).attr('height', function(d) { return d.y1 - d.y0; });
+
+  // Leaves
+  var leaves = svg.selectAll('.leaf')
+    .data(root.leaves())
+    .join('g')
+    .attr('class', 'leaf')
+    .attr('transform', function(d) { return 'translate(' + d.x0 + ',' + d.y0 + ')'; });
+
+  leaves.append('rect')
+    .attr('width', function(d) { return d.x1 - d.x0; })
+    .attr('height', function(d) { return d.y1 - d.y0; })
+    .attr('rx', 2)
+    .attr('fill', function(d) { return vColor(d.data.pct); });
+
+  // Labels
+  leaves.each(function(d) {
+    var w = d.x1 - d.x0, h = d.y1 - d.y0;
+    var g = d3.select(this);
+    var cx = w / 2, cy = h / 2;
+
+    if (w > 20 && h > 14) {
+      var maxChars = Math.max(3, Math.floor(w / 5));
+      var label = d.data.item;
+      if (label.length > maxChars) label = label.slice(0, maxChars - 1) + '…';
+      var fs = w > 80 && h > 28 ? 9 : w > 45 ? 7 : 5.5;
+      g.append('text')
+        .attr('x', cx).attr('y', h > 28 ? cy - 5 : cy)
+        .attr('font-size', fs + 'px').text(label);
+    }
+    if (w > 25 && h > 28) {
+      var pct = d.data.pct;
+      var txt = pct == null ? 'N/A' : pct === 0 ? '0.0%' : (pct > 0 ? '+' : '') + (pct * 100).toFixed(1) + '%';
+      var fs2 = w > 80 ? 8 : 6;
+      g.append('text')
+        .attr('x', cx).attr('y', cy + 5)
+        .attr('font-size', fs2 + 'px').attr('opacity', '.88').text(txt);
+    }
+  });
+
+  // Rich tooltip
+  leaves
+    .on('mousemove', function(event, d) {
+      var dd = d.data;
+      tooltip.innerHTML =
+        '<div class="tt-name">' + dd.item + '</div>' +
+        '<div class="tt-premise">' + d.parent.data.name + '</div>' +
+        '<table>' +
+        '<tr><th></th><th style="text-align:right">Value</th><th style="text-align:right">Var</th><th style="text-align:right">Var%</th></tr>' +
+        metricRow('9L Cases', dd.dep, dd.v9l, dd.pct, fmt(dd.dep)) +
+        metricRow('ACS', dd.acs, dd.vacs, dd.pacs, fmt(dd.acs)) +
+        metricRow('RoS', dd.ros, dd.vros, dd.pros, fmt2(dd.ros)) +
+        metricRow('#Purchases', dd.purch, dd.vpurch, dd.ppurch, fmt(dd.purch)) +
+        metricRow('#Mo. Purch', dd.months, dd.vmonths, dd.pmonths, fmt(dd.months)) +
+        '</table>';
+      tooltip.style.display = 'block';
+      tooltip.style.left = Math.min(event.clientX + 14, window.innerWidth - 370) + 'px';
+      tooltip.style.top = Math.min(event.clientY + 14, window.innerHeight - 200) + 'px';
+    })
+    .on('mouseleave', function() { tooltip.style.display = 'none'; });
+
+  // Sector labels (on top)
+  svg.selectAll('.sector-label-text')
+    .data(root.children)
+    .join('text')
+    .attr('class', 'sector-label')
+    .attr('x', function(d) { return d.x0 + 5; }).attr('y', function(d) { return d.y0 + 12; })
+    .text(function(d) { return d.data.name; })
+    .each(function(d) {
+      var maxW = d.x1 - d.x0 - 8;
+      while (this.getComputedTextLength() > maxW && this.textContent.length > 3)
+        this.textContent = this.textContent.slice(0, -4) + '…';
+    });
+}
+
+// Init
+selSite.addEventListener('change', drawTreemap);
+
+var sizeSlider = document.getElementById('sizeSlider');
+var sizeLabel = document.getElementById('sizeLabel');
+sizeSlider.addEventListener('input', function() {
+  sizeLabel.textContent = this.value + 'px';
+  drawTreemap();
+});
+
+drawTreemap();
+</script>
+</body>
+</html>
