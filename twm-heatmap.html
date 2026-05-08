@@ -171,7 +171,7 @@ function vColor(v) {
   if (v > 0) {
     return 'rgb(' + Math.round(10+(1-t)*60) + ',' + Math.round(50+t*130) + ',' + Math.round(10+(1-t)*50) + ')';
   } else if (v < 0) {
-    return 'rgb(' + Math.round(80+t*120) + ',' + Math.round(30*(1-t)) + ',' + Math.round(20*(1-t)) + ')';
+    return 'rgb(' + Math.round(220-t*90) + ',' + Math.round(70*(1-t)) + ',' + Math.round(60*(1-t)) + ')';
   }
   return 'rgb(70,70,70)';
 }
