@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lalo Tequila YTD Heat Map</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #0a0a2e; color: #fff; overflow-x: hidden; padding-bottom: 40px; }
+  .header-bar { background: #211cbe; padding: 18px 0 14px; margin-bottom: 10px; text-align: center; border-bottom: 3px solid rgba(255,255,255,0.15); }
+  .header-bar .logo-text { font-family: "Cormorant Garamond", Georgia, serif; font-size: 2.2rem; font-weight: 600; letter-spacing: 8px; color: #fff; text-transform: uppercase; }
+  .header-bar .logo-sub { font-family: "Cormorant Garamond", Georgia, serif; font-size: 0.85rem; letter-spacing: 4px; color: rgba(255,255,255,0.7); text-transform: uppercase; margin-top: 2px; }
+  h1 { text-align: center; padding: 12px 0 2px; font-family: "Inter", sans-serif; font-size: 1.2rem; font-weight: 500; letter-spacing: 1px; color: rgba(255,255,255,0.85); text-transform: uppercase; }
+  .controls { display: flex; justify-content: center; align-items: center; gap: 12px; margin: 8px auto 6px; flex-wrap: wrap; padding: 0 10px; }
+  .controls label { font-size: .82rem; color: rgba(255,255,255,0.5); font-family: "Cormorant Garamond", Georgia, serif; letter-spacing: 1px; text-transform: uppercase; }
+  .controls select { background: #12124a; color: #fff; border: 1px solid rgba(33,28,190,0.4); border-radius: 6px; padding: 6px 10px; font-size: .82rem; cursor: pointer; min-width: 160px; font-family: "Inter", sans-serif; }
+  .controls select:focus { outline: none; border-color: #211cbe; }
+  .subtitle { text-align: center; font-size: .78rem; color: rgba(255,255,255,0.4); margin-bottom: 6px; padding: 0 10px; letter-spacing: .5px; }
+  #treemap { width: 100%; margin: 0 auto; }
+  #treemap svg { width: 100%; }
+  .sector-border { stroke: rgba(33,28,190,0.6); stroke-width: 2px; fill: none; rx: 3; }
+  .sector-label { fill: #fff; font-family: "Cormorant Garamond", Georgia, serif; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 2.5px; paint-order: stroke; stroke: #0a0a2e; stroke-width: 3px; pointer-events: none; }
+  .leaf rect { stroke: #0a0a2e; stroke-width: 1px; cursor: pointer; transition: opacity .12s; }
+  .leaf:hover rect { opacity: .8; }
+  .leaf text { fill: #fff; pointer-events: none; font-weight: 600; text-anchor: middle; dominant-baseline: central; }
+  .legend { display: flex; justify-content: center; align-items: center; gap: 10px; margin: 4px auto 8px; font-size: .82rem; color: rgba(255,255,255,0.45); }
+  .legend-bar { width: 260px; height: 12px; border-radius: 6px; border: 1px solid rgba(33,28,190,0.3); }
+  .size-controls { display: flex; justify-content: center; align-items: center; gap: 12px; margin: 0 auto 8px; }
+  .size-controls label { font-size: .78rem; color: rgba(255,255,255,0.4); }
+  .size-controls input[type=range] { -webkit-appearance: none; appearance: none; width: 160px; height: 6px; background: rgba(33,28,190,0.3); border-radius: 3px; outline: none; }
+  .size-controls input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 16px; height: 16px; background: #211cbe; border: 2px solid #fff; border-radius: 50%; cursor: pointer; }
+  .size-controls span { font-size: .75rem; color: rgba(255,255,255,0.35); min-width: 40px; text-align: center; }
+  #tooltip { position: fixed; pointer-events: none; display: none; z-index: 10; background: rgba(10,10,46,.96); border: 1px solid rgba(33,28,190,0.5); border-radius: 8px; padding: 10px 14px; font-size: .82rem; line-height: 1.55; color: #ddd; backdrop-filter: blur(6px); max-width: 320px; }
+  #tooltip .tt-brand { font-weight: 700; font-size: .95rem; color: #fff; font-family: "Cormorant Garamond", Georgia, serif; letter-spacing: .5px; }
+  #tooltip .tt-sub { color: rgba(255,255,255,0.5); font-size: .72rem; margin-bottom: 4px; }
+  .pos { color: #4caf50; }
+  .neg { color: #ef5350; }
+  .neu { color: rgba(255,255,255,0.5); }
+  #summary-table { width: 96%; max-width: 1100px; margin: 30px auto 20px; overflow-x: auto; }
+  #summary-table h2 { font-size: 1.1rem; color: rgba(255,255,255,0.7); margin-bottom: 10px; font-weight: 500; font-family: "Cormorant Garamond", Georgia, serif; letter-spacing: 2px; text-transform: uppercase; }
+  #summary-table table { width: 100%; border-collapse: collapse; font-size: .82rem; }
+  #summary-table th { text-align: left; color: rgba(255,255,255,0.5); font-weight: 600; font-size: .72rem; text-transform: uppercase; padding: 6px 8px; border-bottom: 2px solid rgba(33,28,190,0.4); letter-spacing: .5px; }
+  #summary-table th.right { text-align: right; }
+  #summary-table td { padding: 4px 8px; border-bottom: 1px solid rgba(33,28,190,0.15); color: rgba(255,255,255,0.8); }
+  #summary-table td.right { text-align: right; }
+  #summary-table tr.subtotal td { font-weight: 700; background: rgba(33,28,190,0.08); border-bottom: 2px solid rgba(33,28,190,0.3); color: #fff; }
+  #summary-table tr.brand-row:hover td { background: rgba(33,28,190,0.06); }
+  @media (max-width: 600px) {
+    .header-bar .logo-text { font-size: 1.6rem; letter-spacing: 6px; }
+    h1 { font-size: 1rem; }
+    .subtitle { font-size: .7rem; }
+    #summary-table table { font-size: .7rem; }
+    #summary-table th, #summary-table td { padding: 3px 4px; }
+  }
+</style>
+</head>
+<body>
+<div class="header-bar">
+  <div class="logo-text">LALO</div>
+  <div class="logo-sub">Tequila</div>
+</div>
+<h1>Lalo Tequila YTD Heat Map</h1>
+<div class="controls">
+  <label for="viewSelect">View:</label>
+  <select id="viewSelect">
+    <option value="ownership">By Ownership</option>
+    <option value="item">By Item</option>
+  </select>
+</div>
+<p class="subtitle">Box size = YTD $ | Color = % Change | Tap or hover for details</p>
+<div class="legend">
+  <span>-50%</span>
+  <canvas class="legend-bar" id="legendBar"></canvas>
+  <span>+100%</span>
+</div>
+<div class="size-controls">
+  <label for="sizeSlider">Chart Height:</label>
+  <input type="range" id="sizeSlider" min="300" max="900" value="550" step="50">
+  <span id="sizeLabel">550px</span>
+</div>
+<div id="treemap"></div>
+<div id="tooltip"></div>
+<div id="summary-table"></div>
+<script>
+var ALL_DATA = [{"group": "Specs Liquor Stores HQ", "box": "Lalo Blanco 1.0L", "ytd": 11368.908, "pct": 0.9292, "chg": 5475.923, "cytd_ly": 5892.985, "acs": 216}, {"group": "Independent", "box": "Lalo Blanco 1.0L", "ytd": 4684.406, "pct": 1.0292, "chg": 2375.932, "cytd_ly": 2308.474, "acs": 972}, {"group": "Specs Liquor Stores HQ", "box": "Lalo Blanco 750ml", "ytd": 4625.999, "pct": 0.1623, "chg": 646.084, "cytd_ly": 3979.915, "acs": 215}, {"group": "Independent", "box": "Lalo Blanco 750ml", "ytd": 4253.021, "pct": 0.0413, "chg": 168.561, "cytd_ly": 4084.46, "acs": 1707}, {"group": "Twin Liquor Stores/HQ", "box": "Lalo Blanco 1.0L", "ytd": 2578.801, "pct": 1.5945, "chg": 1584.863, "cytd_ly": 993.938, "acs": 109}, {"group": "Twin Liquor Stores/HQ", "box": "Lalo Blanco 750ml", "ytd": 2424.5, "pct": -0.1194, "chg": -328.745, "cytd_ly": 2753.245, "acs": 108}, {"group": "Total Wine & More/HQ", "box": "Lalo Blanco 1.0L", "ytd": 1784.1, "pct": 0.8713, "chg": 830.714, "cytd_ly": 953.386, "acs": 40}, {"group": "Total Wine & More/HQ", "box": "Lalo Blanco 750ml", "ytd": 1103.5, "pct": -0.1608, "chg": -211.5, "cytd_ly": 1315.0, "acs": 39}, {"group": "Pinkies Inc", "box": "Lalo Blanco 750ml", "ytd": 735.834, "pct": 0.619, "chg": 281.334, "cytd_ly": 454.5, "acs": 22}, {"group": "Independent", "box": "Lalo Blanco 375ml", "ytd": 537.562, "pct": 0.7547, "chg": 231.202, "cytd_ly": 306.36, "acs": 760}, {"group": "WB Liquors/HQ", "box": "Lalo Blanco 1.0L", "ytd": 454.355, "pct": 0.6917, "chg": 185.782, "cytd_ly": 268.573, "acs": 55}, {"group": "Goody Goody Liquor/HQ", "box": "Lalo Blanco 750ml", "ytd": 283.5, "pct": 0.1739, "chg": 42.0, "cytd_ly": 241.5, "acs": 25}, {"group": "WB Liquors/HQ", "box": "Lalo Blanco 750ml", "ytd": 282.0, "pct": -0.0191, "chg": -5.5, "cytd_ly": 287.5, "acs": 56}, {"group": "Specs Liquor Stores HQ", "box": "Lalo Blanco 375ml", "ytd": 228.5, "pct": 0.8884, "chg": 107.5, "cytd_ly": 121.0, "acs": 183}, {"group": "Specs Liquor Stores HQ", "box": "Lalo Blanco HP 750ml", "ytd": 179.584, "pct": 0.0, "chg": 179.584, "cytd_ly": 0.0, "acs": 146}, {"group": "Liquid Town/HQ", "box": "Lalo Blanco 1.0L", "ytd": 179.117, "pct": 43.7793, "chg": 175.117, "cytd_ly": 4.0, "acs": 3}, {"group": "Independent", "box": "Lalo Blanco HP 750ml", "ytd": 155.078, "pct": 0.0, "chg": 155.323, "cytd_ly": -0.245, "acs": 235}, {"group": "Goody Goody Liquor/HQ", "box": "Lalo Blanco 1.0L", "ytd": 146.679, "pct": 0.76, "chg": 63.338, "cytd_ly": 83.341, "acs": 25}, {"group": "Rockwall Beverage Center LP", "box": "Lalo Blanco 750ml", "ytd": 117.0, "pct": 0.0734, "chg": 8.0, "cytd_ly": 109.0, "acs": 25}, {"group": "Total Wine & More/HQ", "box": "Lalo Blanco 375ml", "ytd": 98.5, "pct": 1.094, "chg": 51.46, "cytd_ly": 47.04, "acs": 40}, {"group": "Beverage Depot/HQ", "box": "Lalo Blanco 1.0L", "ytd": 94.673, "pct": -0.0897, "chg": -9.333, "cytd_ly": 104.006, "acs": 4}, {"group": "WB Liquors/HQ", "box": "Lalo Blanco 375ml", "ytd": 85.0, "pct": 0.0731, "chg": 5.79, "cytd_ly": 79.21, "acs": 52}, {"group": "PMA LLC", "box": "Lalo Blanco 1.0L", "ytd": 84.671, "pct": 0.8955, "chg": 40.002, "cytd_ly": 44.669, "acs": 9}, {"group": "Omega Asset Group Inc", "box": "Lalo Blanco 750ml", "ytd": 81.5, "pct": -0.4759, "chg": -74.0, "cytd_ly": 155.5, "acs": 28}, {"group": "Fossil Creek Liquor/HQ", "box": "Lalo Blanco 1.0L", "ytd": 77.009, "pct": 8.6249, "chg": 69.008, "cytd_ly": 8.001, "acs": 16}, {"group": "Spankys Liquor LLC", "box": "Lalo Blanco 750ml", "ytd": 77.0, "pct": 0.2126, "chg": 13.5, "cytd_ly": 63.5, "acs": 9}, {"group": "Twin Liquor Stores/HQ", "box": "Lalo Blanco 375ml", "ytd": 72.667, "pct": 0.2861, "chg": 16.167, "cytd_ly": 56.5, "acs": 85}, {"group": "Fossil Creek Liquor/HQ", "box": "Lalo Blanco 750ml", "ytd": 62.75, "pct": -0.1633, "chg": -12.25, "cytd_ly": 75.0, "acs": 17}, {"group": "Zipps Liquor Inc", "box": "Lalo Blanco 750ml", "ytd": 61.0, "pct": 0.2323, "chg": 11.5, "cytd_ly": 49.5, "acs": 37}, {"group": "Goose Cap Enterprises LLC", "box": "Lalo Blanco 1.0L", "ytd": 54.676, "pct": 8.1127, "chg": 48.676, "cytd_ly": 6.0, "acs": 20}, {"group": "Opit LLC", "box": "Lalo Blanco 1.0L", "ytd": 54.67, "pct": 0.0, "chg": 54.67, "cytd_ly": 0.0, "acs": 2}, {"group": "Spankys Liquor LLC", "box": "Lalo Blanco 1.0L", "ytd": 49.337, "pct": 0.0, "chg": 49.337, "cytd_ly": 0.0, "acs": 3}, {"group": "Liquid Town/HQ", "box": "Lalo Blanco 750ml", "ytd": 47.5, "pct": -0.6607, "chg": -92.5, "cytd_ly": 140.0, "acs": 6}, {"group": "Party Stop/HQ", "box": "Lalo Blanco 750ml", "ytd": 45.0, "pct": 0.3043, "chg": 10.5, "cytd_ly": 34.5, "acs": 7}, {"group": "Total Wine & More/HQ", "box": "Lalo Blanco HP 750ml", "ytd": 44.837, "pct": 0.0, "chg": 44.837, "cytd_ly": 0.0, "acs": 32}, {"group": "CPL Sales LLC", "box": "Lalo Blanco 750ml", "ytd": 42.5, "pct": 0.1806, "chg": 6.5, "cytd_ly": 36.0, "acs": 5}, {"group": "Liquor Bueno Inc", "box": "Lalo Blanco 750ml", "ytd": 42.0, "pct": -0.4878, "chg": -40.0, "cytd_ly": 82.0, "acs": 15}, {"group": "Opit LLC", "box": "Lalo Blanco 750ml", "ytd": 40.5, "pct": 0.0, "chg": 0.0, "cytd_ly": 40.5, "acs": 15}, {"group": "Rockwall Beverage Center LP", "box": "Lalo Blanco 1.0L", "ytd": 39.337, "pct": 2.4707, "chg": 28.003, "cytd_ly": 11.334, "acs": 16}, {"group": "Skips Beer Wine & Liquor LLC", "box": "Lalo Blanco 1.0L", "ytd": 35.669, "pct": 1.9722, "chg": 23.668, "cytd_ly": 12.001, "acs": 15}, {"group": "Peters Cut Rate Liquor/HQ", "box": "Lalo Blanco 1.0L", "ytd": 34.002, "pct": 4.667, "chg": 28.002, "cytd_ly": 6.0, "acs": 3}, {"group": "PMA LLC", "box": "Lalo Blanco 750ml", "ytd": 34.0, "pct": 0.8378, "chg": 15.5, "cytd_ly": 18.5, "acs": 9}, {"group": "Goose Cap Enterprises LLC", "box": "Lalo Blanco 750ml", "ytd": 33.5, "pct": -0.5563, "chg": -42.0, "cytd_ly": 75.5, "acs": 25}, {"group": "Beverage Depot/HQ", "box": "Lalo Blanco 750ml", "ytd": 33.415, "pct": -0.743, "chg": -96.585, "cytd_ly": 130.0, "acs": 4}, {"group": "Skips Beer Wine & Liquor LLC", "box": "Lalo Blanco 750ml", "ytd": 32.5, "pct": -0.4196, "chg": -23.5, "cytd_ly": 56.0, "acs": 15}, {"group": "Twin Liquor Stores/HQ", "box": "Lalo Blanco HP 750ml", "ytd": 31.0, "pct": 61.0, "chg": 30.5, "cytd_ly": 0.5, "acs": 41}, {"group": "Liquorland/HQ", "box": "Lalo Blanco 750ml", "ytd": 30.5, "pct": 0.2979, "chg": 7.0, "cytd_ly": 23.5, "acs": 11}, {"group": "CPL Sales LLC", "box": "Lalo Blanco 1.0L", "ytd": 29.001, "pct": 0.0, "chg": 29.001, "cytd_ly": 0.0, "acs": 2}, {"group": "Holiday Wine & Liquor/HQ", "box": "Lalo Blanco 1.0L", "ytd": 25.335, "pct": -0.1914, "chg": -5.998, "cytd_ly": 31.333, "acs": 10}, {"group": "Tripple S Innovation LLC", "box": "Lalo Blanco 750ml", "ytd": 24.5, "pct": 0.4, "chg": 7.0, "cytd_ly": 17.5, "acs": 17}, {"group": "Liquor Bueno Inc", "box": "Lalo Blanco 375ml", "ytd": 22.0, "pct": -0.102, "chg": -2.5, "cytd_ly": 24.5, "acs": 15}, {"group": "Rockwall Beverage Center LP", "box": "Lalo Blanco 375ml", "ytd": 20.25, "pct": 5.75, "chg": 17.25, "cytd_ly": 3.0, "acs": 16}, {"group": "Pinkies Inc", "box": "Lalo Blanco 375ml", "ytd": 18.625, "pct": 0.1579, "chg": 2.54, "cytd_ly": 16.085, "acs": 16}, {"group": "HNH Investment LP", "box": "Lalo Blanco 750ml", "ytd": 17.0, "pct": -0.15, "chg": -3.0, "cytd_ly": 20.0, "acs": 4}, {"group": "Liquor Bueno Inc", "box": "Lalo Blanco 1.0L", "ytd": 16.67, "pct": 0.4703, "chg": 5.332, "cytd_ly": 11.338, "acs": 11}, {"group": "H&H Beverages", "box": "Lalo Blanco 750ml", "ytd": 14.0, "pct": 0.4, "chg": 4.0, "cytd_ly": 10.0, "acs": 3}, {"group": "Beverage Depot/HQ", "box": "Lalo Blanco 375ml", "ytd": 14.0, "pct": 1.8, "chg": 9.0, "cytd_ly": 5.0, "acs": 4}, {"group": "Solleys Inc", "box": "Lalo Blanco 750ml", "ytd": 14.0, "pct": -0.0175, "chg": -0.25, "cytd_ly": 14.25, "acs": 14}, {"group": "Tripple S Innovation LLC", "box": "Lalo Blanco 375ml", "ytd": 13.5, "pct": 4.4, "chg": 11.0, "cytd_ly": 2.5, "acs": 8}, {"group": "Unavailable", "box": "Lalo Blanco 750ml", "ytd": 13.5, "pct": 0.0, "chg": 13.5, "cytd_ly": 0.0, "acs": 2}, {"group": "Mutti Thind & Jammu LLC", "box": "Lalo Blanco 750ml", "ytd": 13.5, "pct": -0.2059, "chg": -3.5, "cytd_ly": 17.0, "acs": 7}, {"group": "Goody Goody Liquor/HQ", "box": "Lalo Blanco 375ml", "ytd": 13.0, "pct": 0.625, "chg": 5.0, "cytd_ly": 8.0, "acs": 17}, {"group": "Tripple S Innovation LLC", "box": "Lalo Blanco 1.0L", "ytd": 12.001, "pct": 0.0, "chg": 12.001, "cytd_ly": 0.0, "acs": 6}, {"group": "Liquorland/HQ", "box": "Lalo Blanco 1.0L", "ytd": 12.001, "pct": 0.0, "chg": 12.001, "cytd_ly": 0.0, "acs": 5}, {"group": "Skips Beer Wine & Liquor LLC", "box": "Lalo Blanco 375ml", "ytd": 11.5, "pct": 0.15, "chg": 1.5, "cytd_ly": 10.0, "acs": 14}, {"group": "Goose Cap Enterprises LLC", "box": "Lalo Blanco 375ml", "ytd": 11.0, "pct": 0.0, "chg": 11.0, "cytd_ly": 0.0, "acs": 18}, {"group": "Goody Goody Liquor/HQ", "box": "Lalo Blanco HP 750ml", "ytd": 11.0, "pct": 0.0, "chg": 11.0, "cytd_ly": 0.0, "acs": 12}, {"group": "WB Liquors/HQ", "box": "Lalo Blanco HP 750ml", "ytd": 9.251, "pct": 0.0, "chg": 9.251, "cytd_ly": 0.0, "acs": 17}, {"group": "Unavailable", "box": "Lalo Blanco 1.0L", "ytd": 9.222, "pct": 0.0, "chg": 9.222, "cytd_ly": 0.0, "acs": 2}, {"group": "Omega Asset Group Inc", "box": "Lalo Blanco 375ml", "ytd": 9.0, "pct": -0.6327, "chg": -15.5, "cytd_ly": 24.5, "acs": 12}, {"group": "Condor Beverage Co", "box": "Lalo Blanco 750ml", "ytd": 8.0, "pct": -0.3962, "chg": -5.25, "cytd_ly": 13.25, "acs": 4}, {"group": "Plaza Liquors/HQ", "box": "Lalo Blanco 750ml", "ytd": 8.0, "pct": 0.0, "chg": 0.0, "cytd_ly": 8.0, "acs": 4}, {"group": "H&H Beverages", "box": "Lalo Blanco 1.0L", "ytd": 8.0, "pct": 0.0, "chg": 8.0, "cytd_ly": 0.0, "acs": 1}, {"group": "Barrel House/HQ", "box": "Lalo Blanco 750ml", "ytd": 7.664, "pct": -0.0892, "chg": -0.751, "cytd_ly": 8.415, "acs": 8}, {"group": "Pinkies Inc", "box": "Lalo Blanco 1.0L", "ytd": 7.334, "pct": 0.0, "chg": 7.334, "cytd_ly": 0.0, "acs": 3}, {"group": "Mutti Thind & Jammu LLC", "box": "Lalo Blanco 1.0L", "ytd": 6.67, "pct": 4.0038, "chg": 5.337, "cytd_ly": 1.333, "acs": 7}, {"group": "Kindred Spirits & Wine/HQ", "box": "Lalo Blanco 1.0L", "ytd": 6.666, "pct": 1.5004, "chg": 4.0, "cytd_ly": 2.666, "acs": 2}, {"group": "Fossil Creek Liquor/HQ", "box": "Lalo Blanco 375ml", "ytd": 6.5, "pct": 1.1667, "chg": 3.5, "cytd_ly": 3.0, "acs": 9}, {"group": "Arab Acquisitions Co", "box": "Lalo Blanco 750ml", "ytd": 6.0, "pct": 3.0, "chg": 4.5, "cytd_ly": 1.5, "acs": 2}, {"group": "Liquor 101 Inc", "box": "Lalo Blanco 750ml", "ytd": 6.0, "pct": 0.0, "chg": 0.0, "cytd_ly": 6.0, "acs": 3}, {"group": "Kindred Spirits & Wine/HQ", "box": "Lalo Blanco 750ml", "ytd": 6.0, "pct": -0.6129, "chg": -9.5, "cytd_ly": 15.5, "acs": 2}, {"group": "Pinkies Inc", "box": "Lalo Blanco HP 750ml", "ytd": 6.0, "pct": 0.0, "chg": 6.0, "cytd_ly": 0.0, "acs": 8}, {"group": "Solleys Inc", "box": "Lalo Blanco 375ml", "ytd": 5.5, "pct": 4.5, "chg": 4.5, "cytd_ly": 1.0, "acs": 8}, {"group": "Sanbin LLC", "box": "Lalo Blanco 750ml", "ytd": 5.0, "pct": 0.0, "chg": 0.0, "cytd_ly": 5.0, "acs": 5}, {"group": "Messinas Liquor Inc", "box": "Lalo Blanco 750ml", "ytd": 5.0, "pct": -0.2308, "chg": -1.5, "cytd_ly": 6.5, "acs": 5}, {"group": "Mutti Thind & Jammu LLC", "box": "Lalo Blanco HP 750ml", "ytd": 5.0, "pct": 0.0, "chg": 5.0, "cytd_ly": 0.0, "acs": 7}, {"group": "Falls Capital Inc", "box": "Lalo Blanco 750ml", "ytd": 4.83, "pct": -0.356, "chg": -2.67, "cytd_ly": 7.5, "acs": 5}, {"group": "Zipps Liquor Inc", "box": "Lalo Blanco 1.0L", "ytd": 4.669, "pct": 0.0, "chg": 4.669, "cytd_ly": 0.0, "acs": 3}, {"group": "Rockwall Beverage Center LP", "box": "Lalo Blanco HP 750ml", "ytd": 4.5, "pct": 0.0, "chg": 4.5, "cytd_ly": 0.0, "acs": 7}, {"group": "Mutti Thind & Jammu LLC", "box": "Lalo Blanco 375ml", "ytd": 4.5, "pct": 0.0, "chg": 4.5, "cytd_ly": 0.0, "acs": 7}, {"group": "Peters Cut Rate Liquor/HQ", "box": "Lalo Blanco 750ml", "ytd": 4.5, "pct": 0.0, "chg": 0.0, "cytd_ly": 4.5, "acs": 2}, {"group": "Juniper Ventures Of Texas LLC", "box": "Lalo Blanco 1.0L", "ytd": 4.0, "pct": 4.997, "chg": 3.333, "cytd_ly": 0.667, "acs": 1}, {"group": "Solleys Inc", "box": "Lalo Blanco 1.0L", "ytd": 3.667, "pct": 0.0, "chg": 3.667, "cytd_ly": 0.0, "acs": 3}, {"group": "Sanbin LLC", "box": "Lalo Blanco 375ml", "ytd": 3.5, "pct": 2.5, "chg": 2.5, "cytd_ly": 1.0, "acs": 3}, {"group": "Star Liquors Inc/HQ", "box": "Lalo Blanco 750ml", "ytd": 3.5, "pct": -0.3333, "chg": -1.75, "cytd_ly": 5.25, "acs": 4}, {"group": "Sanbin LLC", "box": "Lalo Blanco 1.0L", "ytd": 3.334, "pct": 0.2501, "chg": 0.667, "cytd_ly": 2.667, "acs": 3}, {"group": "Barrel House/HQ", "box": "Lalo Blanco 1.0L", "ytd": 3.333, "pct": -0.0006, "chg": -0.002, "cytd_ly": 3.335, "acs": 6}, {"group": "Liquor 101 Inc", "box": "Lalo Blanco 375ml", "ytd": 3.084, "pct": 1.056, "chg": 1.584, "cytd_ly": 1.5, "acs": 3}, {"group": "HNH Investment LP", "box": "Lalo Blanco HP 750ml", "ytd": 3.0, "pct": 0.0, "chg": 3.0, "cytd_ly": 0.0, "acs": 3}, {"group": "Skips Beer Wine & Liquor LLC", "box": "Lalo Blanco HP 750ml", "ytd": 3.0, "pct": 0.0, "chg": 3.0, "cytd_ly": 0.0, "acs": 6}, {"group": "Military", "box": "Lalo Blanco 750ml", "ytd": 3.0, "pct": -0.4545, "chg": -2.5, "cytd_ly": 5.5, "acs": 3}, {"group": "Party Stop/HQ", "box": "Lalo Blanco 375ml", "ytd": 3.0, "pct": -0.1429, "chg": -0.5, "cytd_ly": 3.5, "acs": 5}, {"group": "Liquor Bueno Inc", "box": "Lalo Blanco HP 750ml", "ytd": 3.0, "pct": 0.0, "chg": 3.0, "cytd_ly": 0.0, "acs": 5}, {"group": "Opit LLC", "box": "Lalo Blanco 375ml", "ytd": 3.0, "pct": 0.2, "chg": 0.5, "cytd_ly": 2.5, "acs": 5}, {"group": "PMA LLC", "box": "Lalo Blanco 375ml", "ytd": 3.0, "pct": -0.1429, "chg": -0.5, "cytd_ly": 3.5, "acs": 5}, {"group": "Liquorland/HQ", "box": "Lalo Blanco 375ml", "ytd": 2.75, "pct": 0.375, "chg": 0.75, "cytd_ly": 2.0, "acs": 3}, {"group": "Messinas Liquor Inc", "box": "Lalo Blanco 1.0L", "ytd": 2.668, "pct": 0.0, "chg": 2.668, "cytd_ly": 0.0, "acs": 3}, {"group": "Falls Capital Inc", "box": "Lalo Blanco 1.0L", "ytd": 2.667, "pct": 0.0, "chg": 2.667, "cytd_ly": 0.0, "acs": 1}, {"group": "Liquid Town/HQ", "box": "Lalo Blanco 375ml", "ytd": 2.665, "pct": 0.5958, "chg": 0.995, "cytd_ly": 1.67, "acs": 6}, {"group": "Silver Dollar Spirits & Wine LLC", "box": "Lalo Blanco 750ml", "ytd": 2.5, "pct": -0.1667, "chg": -0.5, "cytd_ly": 3.0, "acs": 3}, {"group": "Barrel House/HQ", "box": "Lalo Blanco 375ml", "ytd": 2.417, "pct": 4.8241, "chg": 2.002, "cytd_ly": 0.415, "acs": 5}, {"group": "Zipps Liquor Inc", "box": "Lalo Blanco HP 750ml", "ytd": 2.165, "pct": 0.0, "chg": 2.165, "cytd_ly": 0.0, "acs": 4}, {"group": "Liquorland/HQ", "box": "Lalo Blanco HP 750ml", "ytd": 2.084, "pct": 0.0, "chg": 2.084, "cytd_ly": 0.0, "acs": 3}, {"group": "Spankys Liquor LLC", "box": "Lalo Blanco 375ml", "ytd": 2.0, "pct": -0.4286, "chg": -1.5, "cytd_ly": 3.5, "acs": 3}, {"group": "Opit LLC", "box": "Lalo Blanco HP 750ml", "ytd": 2.0, "pct": 0.0, "chg": 2.0, "cytd_ly": 0.0, "acs": 2}, {"group": "Juniper Ventures Of Texas LLC", "box": "Lalo Blanco 750ml", "ytd": 2.0, "pct": 3.0, "chg": 1.5, "cytd_ly": 0.5, "acs": 1}, {"group": "One 53 Inc", "box": "Lalo Blanco 1.0L", "ytd": 2.0, "pct": 0.0, "chg": 2.0, "cytd_ly": 0.0, "acs": 1}, {"group": "Unavailable", "box": "Lalo Blanco 375ml", "ytd": 1.75, "pct": 0.0, "chg": 1.75, "cytd_ly": 0.0, "acs": 1}, {"group": "CPL Sales LLC", "box": "Lalo Blanco HP 750ml", "ytd": 1.75, "pct": 0.0, "chg": 1.75, "cytd_ly": 0.0, "acs": 3}, {"group": "Plaza Liquors/HQ", "box": "Lalo Blanco 1.0L", "ytd": 1.667, "pct": 0.0, "chg": 1.667, "cytd_ly": 0.0, "acs": 3}, {"group": "Liquor 101 Inc", "box": "Lalo Blanco 1.0L", "ytd": 1.666, "pct": 0.0, "chg": 1.666, "cytd_ly": 0.0, "acs": 2}, {"group": "Star Liquors Inc/HQ", "box": "Lalo Blanco 1.0L", "ytd": 1.666, "pct": 0.0, "chg": 1.666, "cytd_ly": 0.0, "acs": 2}, {"group": "Sanbin LLC", "box": "Lalo Blanco HP 750ml", "ytd": 1.5, "pct": 0.0, "chg": 1.5, "cytd_ly": 0.0, "acs": 3}, {"group": "Solleys Inc", "box": "Lalo Blanco HP 750ml", "ytd": 1.5, "pct": 0.0, "chg": 1.5, "cytd_ly": 0.0, "acs": 3}, {"group": "One 53 Inc", "box": "Lalo Blanco 750ml", "ytd": 1.5, "pct": -0.4, "chg": -1.0, "cytd_ly": 2.5, "acs": 1}, {"group": "Ravis Liquor/HQ", "box": "Lalo Blanco 750ml", "ytd": 1.5, "pct": 2.0, "chg": 1.0, "cytd_ly": 0.5, "acs": 2}, {"group": "HNH Investment LP", "box": "Lalo Blanco 375ml", "ytd": 1.5, "pct": 2.0, "chg": 1.0, "cytd_ly": 0.5, "acs": 3}, {"group": "Condor Beverage Co", "box": "Lalo Blanco 375ml", "ytd": 1.5, "pct": 2.0, "chg": 1.0, "cytd_ly": 0.5, "acs": 3}, {"group": "Star Liquors Inc/HQ", "box": "Lalo Blanco HP 750ml", "ytd": 1.5, "pct": 0.0, "chg": 1.5, "cytd_ly": 0.0, "acs": 1}, {"group": "CPL Sales LLC", "box": "Lalo Blanco 375ml", "ytd": 1.5, "pct": -0.25, "chg": -0.5, "cytd_ly": 2.0, "acs": 2}, {"group": "Bens Liquor/HQ", "box": "Lalo Blanco 1.0L", "ytd": 1.333, "pct": 0.0, "chg": 1.333, "cytd_ly": 0.0, "acs": 1}, {"group": "Supreme Liquors", "box": "Lalo Blanco 750ml", "ytd": 1.0, "pct": 1.0, "chg": 0.5, "cytd_ly": 0.5, "acs": 1}, {"group": "Barrel House/HQ", "box": "Lalo Blanco HP 750ml", "ytd": 1.0, "pct": 0.0, "chg": 1.0, "cytd_ly": 0.0, "acs": 2}, {"group": "Holiday Wine & Liquor/HQ", "box": "Lalo Blanco 750ml", "ytd": 1.0, "pct": -0.9775, "chg": -43.5, "cytd_ly": 44.5, "acs": 1}, {"group": "H&H Beverages", "box": "Lalo Blanco HP 750ml", "ytd": 1.0, "pct": 0.0, "chg": 1.0, "cytd_ly": 0.0, "acs": 2}, {"group": "Condor Beverage Co", "box": "Lalo Blanco 1.0L", "ytd": 1.0, "pct": 0.0, "chg": 1.0, "cytd_ly": 0.0, "acs": 1}, {"group": "Liquor 101 Inc", "box": "Lalo Blanco HP 750ml", "ytd": 1.0, "pct": 0.0, "chg": 1.0, "cytd_ly": 0.0, "acs": 2}, {"group": "Tripple S Innovation LLC", "box": "Lalo Blanco HP 750ml", "ytd": 1.0, "pct": 0.0, "chg": 1.0, "cytd_ly": 0.0, "acs": 2}, {"group": "Messinas Liquor Inc", "box": "Lalo Blanco 375ml", "ytd": 1.0, "pct": -0.7143, "chg": -2.5, "cytd_ly": 3.5, "acs": 2}, {"group": "1st Quick Check Conv Stores", "box": "Lalo Blanco 750ml", "ytd": 1.0, "pct": 1.0, "chg": 0.5, "cytd_ly": 0.5, "acs": 2}, {"group": "Champions Liquor & Wine/HQ", "box": "Lalo Blanco 750ml", "ytd": 1.0, "pct": 1.0, "chg": 0.5, "cytd_ly": 0.5, "acs": 2}, {"group": "Holiday Wine & Liquor/HQ", "box": "Lalo Blanco HP 750ml", "ytd": 1.0, "pct": 0.0, "chg": 1.0, "cytd_ly": 0.0, "acs": 2}, {"group": "Kindred Spirits & Wine/HQ", "box": "Lalo Blanco 375ml", "ytd": 1.0, "pct": 0.0, "chg": 1.0, "cytd_ly": 0.0, "acs": 2}, {"group": "Fossil Creek Liquor/HQ", "box": "Lalo Blanco HP 750ml", "ytd": 1.0, "pct": 0.0, "chg": 1.0, "cytd_ly": 0.0, "acs": 2}, {"group": "Goose Cap Enterprises LLC", "box": "Lalo Blanco HP 750ml", "ytd": 1.0, "pct": 0.0, "chg": 1.0, "cytd_ly": 0.0, "acs": 2}, {"group": "Plaza Liquors/HQ", "box": "Lalo Blanco 375ml", "ytd": 1.0, "pct": 0.0, "chg": 1.0, "cytd_ly": 0.0, "acs": 1}, {"group": "Silver Dollar Spirits & Wine LLC", "box": "Lalo Blanco 1.0L", "ytd": 0.999, "pct": 0.0, "chg": 0.999, "cytd_ly": 0.0, "acs": 3}, {"group": "Supreme Liquors", "box": "Lalo Blanco 1.0L", "ytd": 0.667, "pct": 0.0, "chg": 0.667, "cytd_ly": 0.0, "acs": 1}, {"group": "Family Dollar Stores Inc", "box": "Lalo Blanco 1.0L", "ytd": 0.667, "pct": 0.0, "chg": 0.667, "cytd_ly": 0.0, "acs": 1}, {"group": "HNH Investment LP", "box": "Lalo Blanco 1.0L", "ytd": 0.666, "pct": 0.0, "chg": 0.666, "cytd_ly": 0.0, "acs": 2}, {"group": "Champions Liquor & Wine/HQ", "box": "Lalo Blanco 1.0L", "ytd": 0.666, "pct": 0.0, "chg": 0.666, "cytd_ly": 0.0, "acs": 2}, {"group": "One 53 Inc", "box": "Lalo Blanco 375ml", "ytd": 0.5, "pct": 0.0, "chg": 0.0, "cytd_ly": 0.5, "acs": 1}, {"group": "H&H Beverages", "box": "Lalo Blanco 375ml", "ytd": 0.5, "pct": 0.0, "chg": 0.0, "cytd_ly": 0.5, "acs": 1}, {"group": "Chedraui USA Inc", "box": "Lalo Blanco 375ml", "ytd": 0.5, "pct": 0.0, "chg": 0.5, "cytd_ly": 0.0, "acs": 1}, {"group": "Als Liquor Tobacco Wine/HQ", "box": "Lalo Blanco 750ml", "ytd": 0.5, "pct": 0.0, "chg": 0.5, "cytd_ly": 0.0, "acs": 1}, {"group": "Supreme Liquors", "box": "Lalo Blanco 375ml", "ytd": 0.5, "pct": 0.0, "chg": 0.5, "cytd_ly": 0.0, "acs": 1}, {"group": "Falls Capital Inc", "box": "Lalo Blanco HP 750ml", "ytd": 0.5, "pct": 0.0, "chg": 0.5, "cytd_ly": 0.0, "acs": 1}, {"group": "PMA LLC", "box": "Lalo Blanco HP 750ml", "ytd": 0.5, "pct": 0.0, "chg": 0.5, "cytd_ly": 0.0, "acs": 1}, {"group": "Champions Liquor & Wine/HQ", "box": "Lalo Blanco 375ml", "ytd": 0.5, "pct": 0.0, "chg": 0.5, "cytd_ly": 0.0, "acs": 1}, {"group": "Juniper Ventures Of Texas LLC", "box": "Lalo Blanco HP 750ml", "ytd": 0.5, "pct": 0.0, "chg": 0.5, "cytd_ly": 0.0, "acs": 1}, {"group": "Bens Liquor/HQ", "box": "Lalo Blanco 375ml", "ytd": 0.5, "pct": 0.0, "chg": 0.5, "cytd_ly": 0.0, "acs": 1}, {"group": "Arab Acquisitions Co", "box": "Lalo Blanco 375ml", "ytd": 0.5, "pct": 0.0, "chg": 0.5, "cytd_ly": 0.0, "acs": 1}, {"group": "Carnicerias Teloloapan LLC", "box": "Lalo Blanco 750ml", "ytd": 0.5, "pct": 0.0, "chg": 0.0, "cytd_ly": 0.5, "acs": 1}, {"group": "Beverage Depot/HQ", "box": "Lalo Blanco HP 750ml", "ytd": 0.5, "pct": 0.0, "chg": 0.5, "cytd_ly": 0.0, "acs": 1}, {"group": "Holiday Wine & Liquor/HQ", "box": "Lalo Blanco 375ml", "ytd": 0.5, "pct": -0.8333, "chg": -2.5, "cytd_ly": 3.0, "acs": 1}, {"group": "Star Liquors Inc/HQ", "box": "Lalo Blanco 375ml", "ytd": 0.5, "pct": 0.0, "chg": 0.0, "cytd_ly": 0.5, "acs": 1}, {"group": "Liquor World/HQ (203519)", "box": "Lalo Blanco 750ml", "ytd": 0.5, "pct": 0.0, "chg": 0.5, "cytd_ly": 0.0, "acs": 1}, {"group": "1st Quick Check Conv Stores", "box": "Lalo Blanco HP 750ml", "ytd": 0.5, "pct": 0.0, "chg": 0.5, "cytd_ly": 0.0, "acs": 1}, {"group": "Family Dollar Stores Inc", "box": "Lalo Blanco 750ml", "ytd": 0.5, "pct": 0.0, "chg": 0.0, "cytd_ly": 0.5, "acs": 1}, {"group": "Arab Acquisitions Co", "box": "Lalo Blanco 1.0L", "ytd": 0.333, "pct": 0.0, "chg": 0.333, "cytd_ly": 0.0, "acs": 1}, {"group": "7 Eleven Inc HQ", "box": "Lalo Blanco 1.0L", "ytd": 0.0, "pct": -1.0, "chg": -0.667, "cytd_ly": 0.667, "acs": null}, {"group": "Peters Cut Rate Liquor/HQ", "box": "Lalo Blanco 375ml", "ytd": 0.0, "pct": -1.0, "chg": -0.5, "cytd_ly": 0.5, "acs": null}, {"group": "Bens Liquor/HQ", "box": "Lalo Blanco 750ml", "ytd": 0.0, "pct": 0.0, "chg": 0.0, "cytd_ly": 0.0, "acs": null}, {"group": "Juniper Ventures Of Texas LLC", "box": "Lalo Blanco 375ml", "ytd": 0.0, "pct": -1.0, "chg": -0.25, "cytd_ly": 0.25, "acs": null}, {"group": "Liquor Cabinet LLC", "box": "Lalo Blanco 750ml", "ytd": 0.0, "pct": -1.0, "chg": -0.5, "cytd_ly": 0.5, "acs": null}, {"group": "Silver Dollar Spirits & Wine LLC", "box": "Lalo Blanco 375ml", "ytd": -1.0, "pct": 0.0, "chg": -1.0, "cytd_ly": 0.0, "acs": null}];
+var selView = document.getElementById("viewSelect");
+
+var maxNeg = 0.50, maxPos = 1.00;
+function vColor(v) {
+  if (v === null || v === undefined) return "#444";
+  if (v > 0) {
+    var t = Math.min(v / maxPos, 1);
+    return "rgb(" + Math.round(15+(1-t)*40) + "," + Math.round(50+t*110) + "," + Math.round(15+(1-t)*40) + ")";
+  }
+  if (v < 0) {
+    var t = Math.min(Math.abs(v) / maxNeg, 1);
+    return "rgb(" + Math.round(100+t*155) + "," + Math.round(40*(1-t)) + "," + Math.round(40*(1-t)) + ")";
+  }
+  return "rgb(70,70,70)";
+}
+
+var canvas = document.getElementById("legendBar");
+canvas.width = 260; canvas.height = 12;
+var ctx = canvas.getContext("2d");
+for (var x = 0; x < 260; x++) {
+  var frac = x / 259;
+  var val = -maxNeg + frac * (maxNeg + maxPos);
+  ctx.fillStyle = vColor(val);
+  ctx.fillRect(x, 0, 1, 12);
+}
+
+function fmt(n) { return n == null ? "N/A" : n.toLocaleString("en-US", {maximumFractionDigits: 0}); }
+function fmtPct(v) { return v == null ? "N/A" : (v >= 0 ? "+" : "") + (v * 100).toFixed(1) + "%"; }
+function clsStr(v) { return v == null ? "neu" : v > 0 ? "pos" : v < 0 ? "neg" : "neu"; }
+
+var tooltip = document.getElementById("tooltip");
+
+function getView() { return selView.value; }
+
+function drawTreemap() {
+  var view = getView();
+  var sliderVal = parseInt(document.getElementById("sizeSlider").value);
+  var width = 700, height = Math.round(sliderVal * 700 / 800);
+  var groupMap = new Map();
+  ALL_DATA.forEach(function(d) {
+    var gk = view === "item" ? d.box : d.group;
+    var bx = view === "item" ? d.group : d.box;
+    if (!groupMap.has(gk)) groupMap.set(gk, []);
+    groupMap.get(gk).push({group: gk, box: bx, ytd: d.ytd, pct: d.pct, chg: d.chg, cytd_ly: d.cytd_ly, acs: d.acs});
+  });
+  var hierData = { name: "Root", children: Array.from(groupMap, function(e) { return { name: e[0], children: e[1] }; }) };
+  d3.select("#treemap").selectAll("*").remove();
+  var svg = d3.select("#treemap").append("svg")
+    .attr("viewBox", "0 0 " + width + " " + height)
+    .attr("preserveAspectRatio", "xMidYMid meet")
+    .style("width", "100%").style("height", "auto");
+  var root = d3.hierarchy(hierData)
+    .sum(function(d) { return d.ytd || 0; })
+    .sort(function(a, b) { return b.value - a.value; });
+  d3.treemap().size([width, height]).paddingTop(16).paddingInner(3).paddingOuter(2).round(true)(root);
+  svg.selectAll(".sb").data(root.children).join("rect").attr("class", "sector-border")
+    .attr("x", function(d){return d.x0;}).attr("y", function(d){return d.y0;})
+    .attr("width", function(d){return d.x1-d.x0;}).attr("height", function(d){return d.y1-d.y0;});
+  var leaves = svg.selectAll(".leaf").data(root.leaves()).join("g").attr("class", "leaf")
+    .attr("transform", function(d) { return "translate(" + d.x0 + "," + d.y0 + ")"; });
+  leaves.append("rect")
+    .attr("width", function(d){return d.x1-d.x0;}).attr("height", function(d){return d.y1-d.y0;})
+    .attr("rx", 2).attr("fill", function(d) { return vColor(d.data.pct); });
+
+  function wrapText(g, label, cx, startY, maxW, fs) {
+    var words = label.split(/\s+/);
+    var lines = [], cur = "";
+    var test = g.append("text").attr("font-size", fs+"px").style("visibility","hidden");
+    words.forEach(function(w) {
+      var try_ = cur ? cur + " " + w : w;
+      test.text(try_);
+      if (test.node().getComputedTextLength() > maxW - 4 && cur) {
+        lines.push(cur); cur = w;
+      } else { cur = try_; }
+    });
+    if (cur) lines.push(cur);
+    test.remove();
+    var lh = fs + 2;
+    var totalH = lines.length * lh;
+    var topY = startY - totalH / 2 + lh / 2;
+    lines.forEach(function(ln, i) {
+      g.append("text").attr("x", cx).attr("y", topY + i * lh)
+        .attr("font-size", fs+"px").text(ln);
+    });
+    return lines.length;
+  }
+
+  leaves.each(function(d) {
+    var w = d.x1-d.x0, h = d.y1-d.y0, g = d3.select(this), cx = w/2, cy = h/2;
+    var fs = w>80&&h>28 ? 9 : w>45 ? 7 : 5.5;
+    if (w > 20 && h > 14) {
+      var lb = d.data.box;
+      var nameY = h > 28 ? cy - 5 : cy;
+      var nLines = wrapText(g, lb, cx, nameY, w, fs);
+    }
+    if (w > 25 && h > 28) {
+      var p = d.data.pct;
+      var t = p==null?"N/A":p===0?"0.0%":(p>0?"+":"")+(p*100).toFixed(1)+"%";
+      var pctY = cy + (typeof nLines !== "undefined" && nLines > 1 ? nLines * 4 + 4 : 5);
+      g.append("text").attr("x",cx).attr("y",pctY).attr("font-size",(w>80?8:6)+"px").attr("opacity",".88").text(t);
+    }
+  });
+
+  function showTip(event, d) {
+    var p = d.data.pct;
+    var ps = p==null?"N/A":p===0?"0.0%":(p>0?"+":"")+(p*100).toFixed(1)+"%";
+    var c = p==null?"neu":p>0?"pos":"neg";
+    var chgC = clsStr(d.data.chg);
+    tooltip.innerHTML = '<div class="tt-brand">'+d.data.box+'</div>'
+      +'<div class="tt-sub">'+d.parent.data.name+'</div>'
+      +'<div>YTD: <b>'+fmt(d.data.ytd)+'</b></div>'
+      +'<div>CYTD LY: <b>'+fmt(d.data.cytd_ly)+'</b></div>'
+      +'<div>Chg: <b class="'+chgC+'">'+fmt(d.data.chg)+'</b></div>'
+      +'<div>% Chg: <b class="'+c+'">'+ps+'</b></div>'
+      +'<div>ACS: <b>'+fmt(d.data.acs)+'</b></div>';
+    tooltip.style.display = "block";
+    var ex = event.touches ? event.touches[0] : event;
+    tooltip.style.left = Math.min(ex.clientX+14, window.innerWidth-330)+"px";
+    tooltip.style.top = Math.min(ex.clientY+14, window.innerHeight-100)+"px";
+  }
+
+  leaves.on("mousemove", showTip).on("mouseleave", function() { tooltip.style.display="none"; });
+  leaves.on("touchstart", function(event, d) {
+    event.preventDefault(); showTip(event, d);
+    setTimeout(function() { tooltip.style.display="none"; }, 3000);
+  });
+
+  svg.selectAll(".sl").data(root.children).join("text").attr("class", "sector-label")
+    .attr("x", function(d){return d.x0+5;}).attr("y", function(d){return d.y0+12;})
+    .text(function(d){return d.data.name;})
+    .each(function(d) {
+      var mw = d.x1-d.x0-8;
+      while (this.getComputedTextLength()>mw && this.textContent.length>3) this.textContent=this.textContent.slice(0,-4)+"\u2026";
+    });
+
+  buildTable();
+}
+
+function buildTable() {
+  var view = getView();
+  var container = document.getElementById("summary-table");
+  if (ALL_DATA.length === 0) { container.innerHTML = ""; return; }
+  var groups = new Map();
+  ALL_DATA.forEach(function(d) {
+    var gk = view === "item" ? d.box : d.group;
+    var bx = view === "item" ? d.group : d.box;
+    if (!groups.has(gk)) groups.set(gk, []);
+    groups.get(gk).push({gk: gk, bx: bx, ytd: d.ytd, pct: d.pct, chg: d.chg, cytd_ly: d.cytd_ly, acs: d.acs});
+  });
+  var grpLabel = view === "item" ? "Item" : "Ownership";
+  var subLabel = view === "item" ? "Ownership" : "Item";
+  var html = '<h2>Summary Table</h2><div style="overflow-x:auto;"><table>';
+  html += '<tr><th>'+grpLabel+'</th><th>'+subLabel+'</th><th class="right">YTD</th><th class="right">CYTD LY</th><th class="right">Chg</th><th class="right">% Chg</th><th class="right">ACS</th></tr>';
+  var sortedGroups = Array.from(groups.entries()).sort(function(a,b) {
+    var ta = 0, tb = 0; a[1].forEach(function(d){ta+=d.ytd;}); b[1].forEach(function(d){tb+=d.ytd;}); return tb - ta;
+  });
+  sortedGroups.forEach(function(entry) {
+    var groupName = entry[0], items = entry[1];
+    items.sort(function(a,b) { return b.ytd - a.ytd; });
+    var grpYtd = 0, grpChg = 0, grpLy = 0;
+    items.forEach(function(d) { grpYtd += d.ytd; grpChg += (d.chg||0); grpLy += (d.cytd_ly||0); });
+    items.forEach(function(d, i) {
+      var vc = clsStr(d.pct);
+      var chgC = clsStr(d.chg);
+      html += '<tr class="brand-row">';
+      html += "<td>" + (i === 0 ? groupName : "") + "</td>";
+      html += "<td>" + d.bx + "</td>";
+      html += '<td class="right">' + fmt(d.ytd) + "</td>";
+      html += '<td class="right">' + fmt(d.cytd_ly) + "</td>";
+      html += '<td class="right ' + chgC + '">' + fmt(d.chg) + "</td>";
+      html += '<td class="right ' + vc + '">' + fmtPct(d.pct) + "</td>";
+      html += '<td class="right">' + fmt(d.acs) + "</td>";
+      html += "</tr>";
+    });
+    var grpPct = grpLy > 0 ? (grpYtd - grpLy) / grpLy : null;
+    html += '<tr class="subtotal">';
+    html += "<td>" + groupName + " Total</td><td></td>";
+    html += '<td class="right">' + fmt(grpYtd) + "</td>";
+    html += '<td class="right">' + fmt(grpLy) + "</td>";
+    html += '<td class="right ' + clsStr(grpChg) + '">' + fmt(grpChg) + "</td>";
+    html += '<td class="right ' + clsStr(grpPct) + '">' + fmtPct(grpPct) + "</td>";
+    html += "<td></td></tr>";
+  });
+  html += "</table></div>";
+  container.innerHTML = html;
+}
+
+selView.addEventListener("change", drawTreemap);
+var sizeSlider = document.getElementById("sizeSlider");
+var sizeLabel = document.getElementById("sizeLabel");
+sizeSlider.addEventListener("input", function() {
+  sizeLabel.textContent = this.value + "px";
+  drawTreemap();
+});
+
+drawTreemap();
+</script>
+</body>
+</html>
